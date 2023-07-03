@@ -4,8 +4,9 @@
 use std::{f32::consts::PI, time::Duration};
 
 use bevy::{
+    asset::HandleId,
     prelude::*,
-    render::render_resource::{Extent3d, TextureDimension, TextureFormat}, asset::HandleId,
+    render::render_resource::{Extent3d, TextureDimension, TextureFormat},
 };
 
 fn main() {
@@ -23,7 +24,6 @@ struct MainCube;
 #[derive(Component)]
 struct MainCamera;
 
-
 fn setup(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
@@ -35,27 +35,39 @@ fn setup(
         ..default()
     });
 
-        let cube_mesh: Handle<Mesh> = meshes.add(shape::Cube::default().into());
+    let cube_mesh: Handle<Mesh> = meshes.add(shape::Cube::default().into());
+    let side_length: u32 = 2;
+    let spacing = 1. / (side_length) as f32;
 
+    for i in 0..side_length.pow(3) {
+        let mut translation = Vec3::new(
+            (i % side_length) as f32,
+            (i / side_length % side_length) as f32,
+            (i / side_length.pow(2) % side_length) as f32,
+        );
+        translation *= Vec3::splat(spacing);
+        translation -= Vec3::splat(0.5 - spacing / 2.); // The total side length of cube is always 1, so we offset
+                                                        // by 0.5 to get middle in origo. When cube at origo, half of its side is in negative
+                                                        // quadrant, so therefore we subtract the part that is already offset from this phenomenon.
 
-    let parent = commands.spawn(
+        commands.spawn((
             PbrBundle {
-                mesh: meshes.add(shape::Torus::default().into()),
+                mesh: cube_mesh.clone(),
                 material: debug_material.clone(),
-                transform: Transform::from_xyz(0., 0., 0.),
-                visibility: Visibility::Hidden,
+                transform: Transform::from_translation(translation)
+                    .with_scale(Vec3::splat(spacing as f32)),
                 ..default()
-            }).id();
+            },
+            MainCube,
+        ));
+    }
 
-    commands.spawn((
-        PbrBundle {
-            mesh: cube_mesh,
-            material: debug_material.clone(),
-            transform: Transform::from_xyz(0., 0., 0.),
-            ..default()
-        },
-        MainCube,
-    ));
+    commands.spawn(PbrBundle {
+        mesh: meshes.add(shape::Torus::default().into()),
+        material: debug_material.clone(),
+        transform: Transform::from_xyz(0., 0., 0.).with_scale(Vec3::splat(0.03)),
+        ..default()
+    });
 
     commands.spawn(PointLightBundle {
         point_light: PointLight {
@@ -68,60 +80,78 @@ fn setup(
         ..default()
     });
 
-
-    let mut child = commands.spawn((Camera3dBundle {
-        transform: Transform::from_xyz(2., 2., 2.).looking_at(Vec3::new(0., 1., 0.), Vec3::Y),
-        ..default()
-    },
-    MainCamera));
-    child.set_parent(
-        parent
-    );
+    commands.spawn((
+        Camera3dBundle {
+            transform: Transform::from_xyz(2., 2., 2.).looking_at(Vec3::new(0., 1., 0.), Vec3::Y),
+            ..default()
+        },
+        MainCamera,
+    ));
 }
 
+#[derive(Default, Debug, Clone)]
+struct Vec3i {
+    x: i32,
+    y: i32,
+    z: i32,
+}
 
-#[derive(Default,Debug)]
+impl Into<Vec3> for Vec3i {
+    fn into(self) -> Vec3 {
+        Vec3::new(self.x as f32, self.y as f32, self.z as f32)
+    }
+}
+
+#[derive(Default, Debug)]
 struct RotationData {
-    target_rotation: Vec3,
-    current_rotation: Vec3,
+    target_rotation: Vec3i,
+    current_rotation: Vec3i,
     time_started_rotation_y: Duration,
     time_started_rotation_x: Duration,
 }
 
-fn rotate(mut query: Query<&mut Transform, With<MainCamera>>, time: Res<Time>, input: Res<Input<KeyCode>>, mut rotation_data: Local<RotationData>) {
+fn rotate(
+    mut query: Query<&mut Transform, With<MainCamera>>,
+    time: Res<Time>,
+    input: Res<Input<KeyCode>>,
+    mut rotation_data: Local<RotationData>,
+) {
     let rotation_duration = 1.;
-// Start at zero if we get to 4, since that is equal to a full turn
-    if rotation_data.current_rotation.x >= 4. {
-        rotation_data.target_rotation.x -= 4.*(rotation_data.current_rotation.x/4.).floor();
-        rotation_data.current_rotation.x %= 4.;
+    // Start at zero if we get to 4, since that is equal to a full turn
+    if rotation_data.current_rotation.x >= 4 {
+        // RHS rounds down to nearest integer divisible by 4
+        rotation_data.target_rotation.x -= rotation_data.current_rotation.x / 4 * 4;
+        rotation_data.current_rotation.x %= 4;
     }
-    if rotation_data.current_rotation.y >= 4. {
-        rotation_data.target_rotation.y -= 4.*(rotation_data.current_rotation.y/4.).floor();
-        rotation_data.current_rotation.y %= 4.;
+    if rotation_data.current_rotation.y >= 4 {
+        // RHS rounds down to nearest integer divisible by 4
+        rotation_data.target_rotation.y -= rotation_data.current_rotation.y / 4 * 4;
+        rotation_data.current_rotation.y %= 4;
     }
 
     if input.just_pressed(KeyCode::Left) && rotation_data.time_started_rotation_y.is_zero() {
         rotation_data.time_started_rotation_y = time.elapsed();
-        rotation_data.target_rotation.y = rotation_data.current_rotation.y -1.
+        rotation_data.target_rotation.y = rotation_data.current_rotation.y - 1
     }
     if input.just_pressed(KeyCode::Right) && rotation_data.time_started_rotation_y.is_zero() {
         rotation_data.time_started_rotation_y = time.elapsed();
-        rotation_data.target_rotation.y = rotation_data.current_rotation.y +1.
+        rotation_data.target_rotation.y = rotation_data.current_rotation.y + 1
     }
     if input.just_pressed(KeyCode::Up) && rotation_data.time_started_rotation_x.is_zero() {
         rotation_data.time_started_rotation_x = time.elapsed();
-        rotation_data.target_rotation.x = rotation_data.current_rotation.x -1.
+        rotation_data.target_rotation.x = rotation_data.current_rotation.x - 1
     }
     if input.just_pressed(KeyCode::Down) && rotation_data.time_started_rotation_x.is_zero() {
         rotation_data.time_started_rotation_x = time.elapsed();
-        rotation_data.target_rotation.x = rotation_data.current_rotation.x +1.
+        rotation_data.target_rotation.x = rotation_data.current_rotation.x + 1
     }
 
-    let mut rotation_needed = rotation_data.current_rotation;
+    let mut rotation_needed: Vec3 = rotation_data.current_rotation.clone().into();
     if !rotation_data.time_started_rotation_y.is_zero() {
-        let time_elapsed = time.elapsed()- rotation_data.time_started_rotation_y;
-        rotation_needed.y += (rotation_data.target_rotation.y-rotation_data.current_rotation.y).signum()*
-            rotation_curve(time_elapsed.as_secs_f32()/rotation_duration);
+        let time_elapsed = time.elapsed() - rotation_data.time_started_rotation_y;
+        rotation_needed.y += (rotation_data.target_rotation.y - rotation_data.current_rotation.y)
+            .signum() as f32
+            * rotation_curve(time_elapsed.as_secs_f32() / rotation_duration);
         if time_elapsed.as_secs_f32() > rotation_duration {
             rotation_data.time_started_rotation_y = Duration::default();
             rotation_data.current_rotation.y = rotation_data.target_rotation.y;
@@ -129,9 +159,10 @@ fn rotate(mut query: Query<&mut Transform, With<MainCamera>>, time: Res<Time>, i
     }
 
     if !rotation_data.time_started_rotation_x.is_zero() {
-        let time_elapsed = time.elapsed()- rotation_data.time_started_rotation_x;
-        rotation_needed.x += (rotation_data.target_rotation.x-rotation_data.current_rotation.x).signum()*
-            rotation_curve(time_elapsed.as_secs_f32()/rotation_duration);
+        let time_elapsed = time.elapsed() - rotation_data.time_started_rotation_x;
+        rotation_needed.x += (rotation_data.target_rotation.x - rotation_data.current_rotation.x)
+            .signum() as f32
+            * rotation_curve(time_elapsed.as_secs_f32() / rotation_duration);
         if time_elapsed.as_secs_f32() > rotation_duration {
             rotation_data.time_started_rotation_x = Duration::default();
             rotation_data.current_rotation.x = rotation_data.target_rotation.x;
@@ -139,23 +170,46 @@ fn rotate(mut query: Query<&mut Transform, With<MainCamera>>, time: Res<Time>, i
     }
     dbg!(&rotation_data);
 
-
     for mut camera in &mut query {
-        let rot = Quat::from_euler(EulerRot::XYZ, 0.,rotation_needed.y*PI/2., 0. );
+        let mut rot = Quat::from_euler(EulerRot::XYZ, 0., rotation_needed.y * PI / 2., 0.);
         camera.translation = Vec3::new(2., 2., 2.);
         camera.translate_around(Vec3::new(0., 0., 0.), rot);
-        let rot = Quat::from_euler(EulerRot::XYZ, rotation_needed.x*PI/2., 0. ,0.);
+
+        let up: Vec3;
+        let angle = rotation_needed.x * PI / 2.;
+        // When spinning around the y-axis we are also spinning the location of the x-axis. We
+        // always want the "x-axis" to be the left face of the cube seen from the camera
+        let mut rotation_parity = rotation_data.current_rotation.y % 4;
+        if rotation_parity.is_negative() {
+            rotation_parity += 4;
+        }
+        match rotation_parity {
+            0 => {
+                rot = Quat::from_euler(EulerRot::XYZ, 0., 0., angle);
+                up = Vec3::new((angle + PI / 2.).cos(), (angle + PI / 2.).sin(), 0.);
+            }
+            1 => {
+                rot = Quat::from_euler(EulerRot::XYZ, angle, 0., 0.);
+                up = Vec3::new(0., (-angle + PI / 2.).sin(), (-angle + PI / 2.).cos());
+            }
+            2 => {
+                rot = Quat::from_euler(EulerRot::XYZ, 0., 0., -angle);
+                up = Vec3::new((-angle + PI / 2.).cos(), (-angle + PI / 2.).sin(), 0.);
+            }
+            3 => {
+                rot = Quat::from_euler(EulerRot::XYZ, -angle, 0., 0.);
+                up = Vec3::new(0., (angle + PI / 2.).sin(), (angle + PI / 2.).cos());
+            }
+            _ => {
+                unreachable!()
+            }
+        }
         camera.translate_around(Vec3::new(0., 0., 0.), rot);
-        camera.look_at(Vec3::new(0., 0., 0.), vector_from_heading_x(rotation_needed.x*PI/2.));
+        camera.look_at(Vec3::new(0., 0., 0.), up);
     }
 }
 
-fn vector_from_heading_x(angle_x: f32) -> Vec3 {
-    let angle = -angle_x+PI/2.;
-    Vec3::new(0., angle.sin(), angle.cos())
-}
-
-fn rotation_curve(time:f32) -> f32 {
+fn rotation_curve(time: f32) -> f32 {
     if time >= 1. {
         return 1.;
     }
