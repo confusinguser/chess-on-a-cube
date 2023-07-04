@@ -5,6 +5,7 @@ use std::{f32::consts::PI, time::Duration};
 mod gamemanager;
 
 use bevy::{
+    asset::HandleId,
     prelude::*,
     render::render_resource::{Extent3d, TextureDimension, TextureFormat},
 };
@@ -24,7 +25,7 @@ fn main() {
 struct MainCube;
 
 #[derive(Component)]
-struct MainCamera;
+                   struct MainCamera;
 
 fn setup(
     mut commands: Commands,
@@ -37,59 +38,27 @@ fn setup(
         ..default()
     });
 
-    let plane_mesh: Handle<Mesh> = meshes.add(shape::Plane::default().into());
-    let side_length: u32 = 3;
+    let cube_mesh: Handle<Mesh> = meshes.add(shape::Cube::default().into());
+    let side_length: u32 = 2;
     let spacing = 1. / (side_length) as f32;
-    let mut translation;
-    let mut rotation;
-    let offset = 0.5 - spacing / 2.;
     for side in 0..6 {
         for i in 0..side_length.pow(2) {
-            match side {
-                0 | 1 => {
-                    translation = Vec3::new(
-                        (i % side_length) as f32 * spacing - offset,
-                        if side % 2 == 0 { 0.5 } else { -0.5 },
-                        (i / side_length % side_length) as f32 * spacing - offset,
-                    );
-                    rotation = Vec3::new(0., 0., 2.);
-                }
-                2 | 3 => {
-                    translation = Vec3::new(
-                        (i % side_length) as f32 * spacing - offset,
-                        (i / side_length % side_length) as f32 * spacing - offset,
-                        if side % 2 == 1 { 0.5 } else { -0.5 },
-                    );
-                    rotation = Vec3::new(1., 0., 0.);
-                }
-                4 | 5 => {
-                    translation = Vec3::new(
-                        if side % 2 == 0 { 0.5 } else { -0.5 },
-                        (i / side_length % side_length) as f32 * spacing - offset,
-                        (i % side_length) as f32 * spacing - offset,
-                    );
-                    rotation = Vec3::new(0., 0., 1.);
-                }
-                _ => unreachable!(),
-            }
-
-            rotation *= Vec3::splat(PI / 2.);
-            if side % 2 == 0 {
-                rotation.x -= if rotation.x == 0. { 0. } else { PI };
-                rotation.y -= if rotation.y == 0. { 0. } else { PI };
-                rotation.z -= if rotation.z == 0. { 0. } else { PI };
-            }
-            // The total side length of cube is always 1, so we offset
-            // by 0.5 to get middle in origo. When cube at origo, half of its side is in negative
-            // quadrant, so therefore we subtract the part that is already offset from this phenomenon.
+            let mut translation = Vec3::new(
+                (i % side_length) as f32,
+                (i / side_length % side_length) as f32,
+                (i / side_length.pow(2) % side_length) as f32,
+            );
+            translation *= Vec3::splat(spacing);
+            translation -= Vec3::splat(0.5 - spacing / 2.); // The total side length of cube is always 1, so we offset
+                                                            // by 0.5 to get middle in origo. When cube at origo, half of its side is in negative
+                                                            // quadrant, so therefore we subtract the part that is already offset from this phenomenon.
 
             commands.spawn((
                 PbrBundle {
-                    mesh: plane_mesh.clone(),
+                    mesh: cube_mesh.clone(),
                     material: debug_material.clone(),
                     transform: Transform::from_translation(translation)
-                        .with_scale(Vec3::splat(spacing))
-                        .with_rotation(Quat::from_scaled_axis(rotation)),
+                        .with_scale(Vec3::splat(spacing as f32)),
                     ..default()
                 },
                 PickableBundle::default(),
@@ -102,7 +71,7 @@ fn setup(
     commands.spawn(PbrBundle {
         mesh: meshes.add(shape::Torus::default().into()),
         material: debug_material.clone(),
-        transform: Transform::from_xyz(0., 1., 0.).with_scale(Vec3::splat(0.03)),
+        transform: Transform::from_xyz(0., 0., 0.).with_scale(Vec3::splat(0.03)),
         ..default()
     });
 
@@ -134,9 +103,9 @@ struct Vec3i {
     z: i32,
 }
 
-impl From<Vec3i> for Vec3 {
-    fn from(val: Vec3i) -> Self {
-        Vec3::new(val.x as f32, val.y as f32, val.z as f32)
+impl Into<Vec3> for Vec3i {
+    fn into(self) -> Vec3 {
+        Vec3::new(self.x as f32, self.y as f32, self.z as f32)
     }
 }
 
@@ -206,8 +175,7 @@ fn rotate(
             rotation_data.current_rotation.x = rotation_data.target_rotation.x;
         }
     }
-
-    dbg!(rotation_needed);
+    dbg!(&rotation_data);
 
     for mut camera in &mut query {
         let mut rot = Quat::from_euler(EulerRot::XYZ, 0., rotation_needed.y * PI / 2., 0.);
