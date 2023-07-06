@@ -93,7 +93,7 @@ fn setup(
     ));
 }
 
-#[derive(Default, Debug, Clone)]
+#[derive(Default, Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 struct Vec3i {
     x: i32,
     y: i32,

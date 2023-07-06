@@ -1,7 +1,11 @@
+use std::collections::BTreeMap;
+
 use bevy::prelude::*;
+use bevy::utils::petgraph::Direction;
 use bevy_mod_picking::prelude::*;
 
 use crate::scene::{self, MainCube};
+use crate::Vec3i;
 
 #[derive(Resource)]
 pub(crate) struct Game {
@@ -26,25 +30,20 @@ enum GamePhase {
 }
 
 pub(crate) struct Board {
-    board: [Vec<Cell>; 6],
+    board: BTreeMap<CellCoordinates, Cell>,
     pub(crate) cube_side_length: u32,
 }
 
 impl Board {
     fn get_cell(&self, coords: CellCoordinates) -> Option<&Cell> {
-        self.board[coords.side as usize].get((coords.y * self.cube_side_length + coords.x) as usize)
+        self.board.get(&coords)
     }
     pub(crate) fn get_cell_mut(&mut self, coords: CellCoordinates) -> Option<&mut Cell> {
-        self.board[coords.side as usize]
-            .get_mut((coords.y * self.cube_side_length + coords.x) as usize)
+        self.board.get_mut(&coords)
     }
     fn new(cube_side_length: u32) -> Self {
-        let mut board: [Vec<Cell>; 6] = Default::default();
-        for side in &mut board {
-            *side = vec![Cell::default(); cube_side_length.pow(2) as usize];
-        }
         Board {
-            board,
+            board: BTreeMap::new(),
             cube_side_length,
         }
     }
@@ -95,24 +94,17 @@ enum UnitType {
     Normal,
 }
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) struct CellCoordinates {
-    side: u32,
-    x: u32,
-    y: u32,
+    x: i32,
+    y: i32,
+    z: i32,
+    direction: Vec3,
 }
 
 impl CellCoordinates {
-    fn from_side_index(side: u32, index: u32, cube_size: u32) -> Self {
-        CellCoordinates {
-            side,
-            x: index % cube_size,
-            y: index / cube_size,
-        }
-    }
-
-    pub(crate) fn new(side: u32, x: u32, y: u32) -> Self {
-        CellCoordinates { side, x, y }
+    pub(crate) fn new(x: i32, y: i32, z: i32, direction: Vec3) -> Self {
+        CellCoordinates { x, y, z, direction }
     }
 
     fn manhattan_distance(c1: Self, c2: Self) -> f32 {

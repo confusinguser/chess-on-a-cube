@@ -7,21 +7,6 @@ use bevy::prelude::Vec3;
 
 use crate::gamemanager::{self, CellCoordinates, Game};
 
-const HIGHLIGHT_TINT: Highlight<StandardMaterial> = Highlight {
-    hovered: Some(HighlightKind::new_dynamic(|matl| StandardMaterial {
-        base_color: matl.base_color + vec4(-0.2, -0.2, 0.4, 0.0),
-        ..matl.to_owned()
-    })),
-    pressed: Some(HighlightKind::new_dynamic(|matl| StandardMaterial {
-        base_color: matl.base_color + vec4(-0.3, -0.3, 0.5, 0.0),
-        ..matl.to_owned()
-    })),
-    selected: Some(HighlightKind::new_dynamic(|matl| StandardMaterial {
-        base_color: matl.base_color + vec4(-0.3, 0.2, -0.3, 0.0),
-        ..matl.to_owned()
-    })),
-};
-
 pub(crate) fn construct_cube(
     side_length: u32,
     meshes: &mut ResMut<Assets<Mesh>>,
@@ -33,11 +18,15 @@ pub(crate) fn construct_cube(
     let plane_mesh: Handle<Mesh> = meshes.add(shape::Plane::default().into());
     let spacing = 1. / (side_length) as f32;
     let offset = 0.5 - spacing / 2.;
+    // The total side length of cube is always 1, so we offset
+    // by 0.5 to get middle in origo. When cube at origo, half of its side is in negative
+    // quadrant, so therefore we subtract the part that is already offset from this phenomenon.
     for side in 0..6 {
         //        lookup_planes.planes[side] = vec![None; side_length.pow(2) as usize];
         for i in 0..side_length.pow(2) {
             let translation;
             let mut rotation;
+            let coords;
             match side {
                 0 | 1 => {
                     translation = Vec3::new(
@@ -45,7 +34,13 @@ pub(crate) fn construct_cube(
                         if side % 2 == 0 { 0.5 } else { -0.5 },
                         (i / side_length % side_length) as f32 * spacing - offset,
                     );
-                    rotation = Vec3::new(0., 0., 2.);
+                    rotation = Vec3::new(0., 0., 2.); // Up/down rotate 180 degrees, which is 2 turns
+                    coords = CellCoordinates::new(
+                        translation.x as i32,
+                        0,
+                        translation.z as i32,
+                        if side % 2 == 0 { Vec3::Y } else { Vec3::NEG_Y },
+                    )
                 }
                 2 | 3 => {
                     translation = Vec3::new(
@@ -54,6 +49,12 @@ pub(crate) fn construct_cube(
                         if side % 2 == 1 { 0.5 } else { -0.5 },
                     );
                     rotation = Vec3::new(1., 0., 0.);
+                    coords = CellCoordinates::new(
+                        translation.x as i32,
+                        translation.y as i32,
+                        0,
+                        if side % 2 == 0 { Vec3::Z } else { Vec3::NEG_Z },
+                    )
                 }
                 4 | 5 => {
                     translation = Vec3::new(
@@ -62,6 +63,12 @@ pub(crate) fn construct_cube(
                         (i % side_length) as f32 * spacing - offset,
                     );
                     rotation = Vec3::new(0., 0., 1.);
+                    coords = CellCoordinates::new(
+                        0,
+                        translation.y as i32,
+                        translation.z as i32,
+                        if side % 2 == 0 { Vec3::X } else { Vec3::NEG_X },
+                    )
                 }
                 _ => unreachable!(),
             }
@@ -72,11 +79,7 @@ pub(crate) fn construct_cube(
                 rotation.y -= if rotation.y == 0. { 0. } else { PI };
                 rotation.z -= if rotation.z == 0. { 0. } else { PI };
             }
-            // The total side length of cube is always 1, so we offset
-            // by 0.5 to get middle in origo. When cube at origo, half of its side is in negative
-            // quadrant, so therefore we subtract the part that is already offset from this phenomenon.
 
-            let coords = CellCoordinates::new(side, i % side_length, i / side_length);
             let mut material_specific = material.clone();
             material_specific.base_color.set_r(i as f32);
             let plane = commands
