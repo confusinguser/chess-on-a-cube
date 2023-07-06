@@ -1,9 +1,6 @@
-//! This example demonstrates the built-in 3d shapes in Bevy.
-//! The scene includes a patterned texture and a rotation for visualizing the normals and UVs.
-
 use std::{f32::consts::PI, time::Duration};
 mod gamemanager;
-mod materials;
+mod scene;
 
 use bevy::{
     prelude::*,
@@ -11,24 +8,27 @@ use bevy::{
 };
 use bevy_mod_picking::prelude::*;
 
+use self::gamemanager::Game;
+use self::scene::construct_cube;
+
 fn main() {
     App::new()
         .add_plugins(DefaultPlugins.set(ImagePlugin::default_nearest()))
-        .add_plugins(DefaultPickingPlugins)
+        .add_plugins(
+            DefaultPickingPlugins
+                .build()
+                .disable::<DefaultHighlightingPlugin>(),
+        )
         .insert_resource(LookupPlanes {
             planes: Default::default(),
         })
+        .insert_resource(Game::new(3))
         .add_startup_system(setup)
         .add_system(rotate)
         .run();
 }
 
 /// A marker component for our shapes so we can query them separately from the ground plane
-#[derive(Component)]
-struct MainCube {
-    side: usize,
-    index: u32,
-}
 
 #[derive(Component)]
 struct MainCamera;
@@ -44,78 +44,26 @@ fn setup(
     mut images: ResMut<Assets<Image>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
     mut lookup_planes: ResMut<LookupPlanes>,
+    mut game: ResMut<Game>,
 ) {
     let debug_material = materials.add(StandardMaterial {
         base_color_texture: Some(images.add(uv_debug_texture())),
         ..default()
     });
 
-    let plane_mesh: Handle<Mesh> = meshes.add(shape::Plane::default().into());
-    let side_length: u32 = 3;
-    let spacing = 1. / (side_length) as f32;
-    let offset = 0.5 - spacing / 2.;
-    for side in 0..6 {
-        lookup_planes.planes[side] = vec![None; side_length.pow(2) as usize];
-        for i in 0..side_length.pow(2) {
-            let translation;
-            let mut rotation;
-            match side {
-                0 | 1 => {
-                    translation = Vec3::new(
-                        (i % side_length) as f32 * spacing - offset,
-                        if side % 2 == 0 { 0.5 } else { -0.5 },
-                        (i / side_length % side_length) as f32 * spacing - offset,
-                    );
-                    rotation = Vec3::new(0., 0., 2.);
-                }
-                2 | 3 => {
-                    translation = Vec3::new(
-                        (i % side_length) as f32 * spacing - offset,
-                        (i / side_length % side_length) as f32 * spacing - offset,
-                        if side % 2 == 1 { 0.5 } else { -0.5 },
-                    );
-                    rotation = Vec3::new(1., 0., 0.);
-                }
-                4 | 5 => {
-                    translation = Vec3::new(
-                        if side % 2 == 0 { 0.5 } else { -0.5 },
-                        (i / side_length % side_length) as f32 * spacing - offset,
-                        (i % side_length) as f32 * spacing - offset,
-                    );
-                    rotation = Vec3::new(0., 0., 1.);
-                }
-                _ => unreachable!(),
-            }
+    let material = StandardMaterial {
+        base_color: Color::ANTIQUE_WHITE,
+        ..default()
+    };
 
-            rotation *= Vec3::splat(PI / 2.);
-            if side % 2 == 0 {
-                rotation.x -= if rotation.x == 0. { 0. } else { PI };
-                rotation.y -= if rotation.y == 0. { 0. } else { PI };
-                rotation.z -= if rotation.z == 0. { 0. } else { PI };
-            }
-            // The total side length of cube is always 1, so we offset
-            // by 0.5 to get middle in origo. When cube at origo, half of its side is in negative
-            // quadrant, so therefore we subtract the part that is already offset from this phenomenon.
-
-            let plane = commands
-                .spawn((
-                    PbrBundle {
-                        mesh: plane_mesh.clone(),
-                        material: debug_material.clone(),
-                        transform: Transform::from_translation(translation)
-                            .with_scale(Vec3::splat(spacing))
-                            .with_rotation(Quat::from_scaled_axis(rotation)),
-                        ..default()
-                    },
-                    PickableBundle::default(),
-                    RaycastPickTarget::default(),
-                    MainCube { side, index: i },
-                    OnPointer::<Click>::run_callback(gamemanager::on_cell_clicked),
-                ))
-                .id();
-            lookup_planes.planes[side][i as usize] = Some(plane);
-        }
-    }
+    construct_cube(
+        game.board.cube_side_length,
+        &mut meshes,
+        &mut commands,
+        &mut materials,
+        &material,
+        &mut game,
+    );
 
     commands.spawn(PbrBundle {
         mesh: meshes.add(shape::Torus::default().into()),
