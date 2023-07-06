@@ -3,6 +3,7 @@
 
 use std::{f32::consts::PI, time::Duration};
 mod gamemanager;
+mod materials;
 
 use bevy::{
     prelude::*,
@@ -14,6 +15,9 @@ fn main() {
     App::new()
         .add_plugins(DefaultPlugins.set(ImagePlugin::default_nearest()))
         .add_plugins(DefaultPickingPlugins)
+        .insert_resource(LookupPlanes {
+            planes: Default::default(),
+        })
         .add_startup_system(setup)
         .add_system(rotate)
         .run();
@@ -21,16 +25,25 @@ fn main() {
 
 /// A marker component for our shapes so we can query them separately from the ground plane
 #[derive(Component)]
-struct MainCube;
+struct MainCube {
+    side: usize,
+    index: u32,
+}
 
 #[derive(Component)]
 struct MainCamera;
+
+#[derive(Resource)]
+struct LookupPlanes {
+    planes: [Vec<Option<Entity>>; 6],
+}
 
 fn setup(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut images: ResMut<Assets<Image>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
+    mut lookup_planes: ResMut<LookupPlanes>,
 ) {
     let debug_material = materials.add(StandardMaterial {
         base_color_texture: Some(images.add(uv_debug_texture())),
@@ -40,11 +53,12 @@ fn setup(
     let plane_mesh: Handle<Mesh> = meshes.add(shape::Plane::default().into());
     let side_length: u32 = 3;
     let spacing = 1. / (side_length) as f32;
-    let mut translation;
-    let mut rotation;
     let offset = 0.5 - spacing / 2.;
     for side in 0..6 {
+        lookup_planes.planes[side] = vec![None; side_length.pow(2) as usize];
         for i in 0..side_length.pow(2) {
+            let translation;
+            let mut rotation;
             match side {
                 0 | 1 => {
                     translation = Vec3::new(
@@ -83,26 +97,30 @@ fn setup(
             // by 0.5 to get middle in origo. When cube at origo, half of its side is in negative
             // quadrant, so therefore we subtract the part that is already offset from this phenomenon.
 
-            commands.spawn((
-                PbrBundle {
-                    mesh: plane_mesh.clone(),
-                    material: debug_material.clone(),
-                    transform: Transform::from_translation(translation)
-                        .with_scale(Vec3::splat(spacing))
-                        .with_rotation(Quat::from_scaled_axis(rotation)),
-                    ..default()
-                },
-                PickableBundle::default(),
-                RaycastPickTarget::default(),
-                MainCube,
-            ));
+            let plane = commands
+                .spawn((
+                    PbrBundle {
+                        mesh: plane_mesh.clone(),
+                        material: debug_material.clone(),
+                        transform: Transform::from_translation(translation)
+                            .with_scale(Vec3::splat(spacing))
+                            .with_rotation(Quat::from_scaled_axis(rotation)),
+                        ..default()
+                    },
+                    PickableBundle::default(),
+                    RaycastPickTarget::default(),
+                    MainCube { side, index: i },
+                    OnPointer::<Click>::run_callback(gamemanager::on_cell_clicked),
+                ))
+                .id();
+            lookup_planes.planes[side][i as usize] = Some(plane);
         }
     }
 
     commands.spawn(PbrBundle {
         mesh: meshes.add(shape::Torus::default().into()),
         material: debug_material.clone(),
-        transform: Transform::from_xyz(0., 1., 0.).with_scale(Vec3::splat(0.03)),
+        transform: Transform::from_xyz(0., 0., 0.).with_scale(Vec3::splat(0.03)),
         ..default()
     });
 
@@ -207,8 +225,6 @@ fn rotate(
         }
     }
 
-    dbg!(rotation_needed);
-
     for mut camera in &mut query {
         let mut rot = Quat::from_euler(EulerRot::XYZ, 0., rotation_needed.y * PI / 2., 0.);
         camera.translation = Vec3::new(2., 2., 2.);
@@ -259,7 +275,7 @@ fn rotation_curve(time: f32) -> f32 {
     let c1 = 1.70158;
     let c3 = c1 + 1.;
 
-    return 1. + c3 * (time - 1.).powi(3) + c1 * (time - 1.).powi(2);
+    1. + c3 * (time - 1.).powi(3) + c1 * (time - 1.).powi(2)
 }
 
 /// Creates a colorful test pattern

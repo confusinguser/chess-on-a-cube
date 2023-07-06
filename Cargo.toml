@@ -7,4 +7,5 @@ edition = "2021"
 
 [dependencies]
 bevy = "0.10.1"
+bevy_eventlistener = "0.2.2"
 bevy_mod_picking = "0.13.0"
