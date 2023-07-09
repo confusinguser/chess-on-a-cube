@@ -25,10 +25,9 @@ fn main() {
         .insert_resource(Game::new(3))
         .add_startup_system(setup)
         .add_system(rotate)
+        .add_system(scene::update_cell_colors)
         .run();
 }
-
-/// A marker component for our shapes so we can query them separately from the ground plane
 
 #[derive(Component)]
 struct MainCamera;

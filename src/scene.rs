@@ -36,10 +36,10 @@ pub(crate) fn construct_cube(
                     );
                     rotation = Vec3::new(0., 0., 2.); // Up/down rotate 180 degrees, which is 2 turns
                     coords = CellCoordinates::new(
-                        translation.x as i32,
+                        i % side_length,
                         0,
-                        translation.z as i32,
-                        if side % 2 == 0 { Vec3::Y } else { Vec3::NEG_Y },
+                        i / side_length % side_length,
+                        side % 2 == 0,
                     )
                 }
                 2 | 3 => {
@@ -50,10 +50,10 @@ pub(crate) fn construct_cube(
                     );
                     rotation = Vec3::new(1., 0., 0.);
                     coords = CellCoordinates::new(
-                        translation.x as i32,
-                        translation.y as i32,
+                        i % side_length,
+                        i / side_length % side_length,
                         0,
-                        if side % 2 == 0 { Vec3::Z } else { Vec3::NEG_Z },
+                        side % 2 == 0,
                     )
                 }
                 4 | 5 => {
@@ -65,9 +65,9 @@ pub(crate) fn construct_cube(
                     rotation = Vec3::new(0., 0., 1.);
                     coords = CellCoordinates::new(
                         0,
-                        translation.y as i32,
-                        translation.z as i32,
-                        if side % 2 == 0 { Vec3::X } else { Vec3::NEG_X },
+                        i / side_length % side_length,
+                        i % side_length,
+                        side % 2 == 0,
                     )
                 }
                 _ => unreachable!(),
@@ -98,6 +98,8 @@ pub(crate) fn construct_cube(
                     OnPointer::<Click>::run_callback(gamemanager::on_cell_clicked),
                 ))
                 .id();
+
+            game.board.new_cell(coords);
             game.board.get_cell_mut(coords).unwrap().set_plane(plane);
             //lookup_planes.planes[side][i as usize] = Some(plane);
         }
@@ -109,10 +111,33 @@ pub(crate) struct MainCube {
     pub(crate) coords: CellCoordinates,
 }
 
-pub(crate) fn select_cell_material(to_select_material: &mut StandardMaterial) {
-    to_select_material.base_color = Color::YELLOW
+pub(crate) fn select_cell_material(material: &mut StandardMaterial) {
+    material.base_color = Color::YELLOW
 }
 
-pub(crate) fn unselect_cell_material(to_unselect_material: &mut StandardMaterial) {
-    to_unselect_material.base_color = Color::ANTIQUE_WHITE;
+pub(crate) fn normal_cell_material(material: &mut StandardMaterial) {
+    material.base_color = Color::ANTIQUE_WHITE;
+}
+
+pub(crate) fn mark_can_go_cell_material(material: &mut StandardMaterial) {
+    material.base_color = Color::LIME_GREEN;
+}
+pub(crate) fn update_cell_colors(
+    query: Query<(&mut Handle<StandardMaterial>, &MainCube)>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+    game: ResMut<Game>,
+) {
+    for cell in game.board.get_all_cells() {
+        let plane = cell.plane.unwrap();
+
+        let query_result = query.get(plane).unwrap();
+        let material = materials.get_mut(query_result.0).unwrap();
+        if game.selected_cell.map_or(false, |x| x == cell.coords) {
+            select_cell_material(material);
+        } else if cell.selected_unit_can_go {
+            mark_can_go_cell_material(material);
+        } else {
+            normal_cell_material(material);
+        }
+    }
 }
