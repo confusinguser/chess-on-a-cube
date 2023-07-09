@@ -6,6 +6,7 @@ use std::f32::consts::PI;
 use bevy::prelude::Vec3;
 
 use crate::gamemanager::{self, CellCoordinates, Game};
+use crate::materials;
 
 pub(crate) fn construct_cube(
     side_length: u32,
@@ -110,18 +111,6 @@ pub(crate) fn construct_cube(
 pub(crate) struct MainCube {
     pub(crate) coords: CellCoordinates,
 }
-
-pub(crate) fn select_cell_material(material: &mut StandardMaterial) {
-    material.base_color = Color::YELLOW
-}
-
-pub(crate) fn normal_cell_material(material: &mut StandardMaterial) {
-    material.base_color = Color::ANTIQUE_WHITE;
-}
-
-pub(crate) fn mark_can_go_cell_material(material: &mut StandardMaterial) {
-    material.base_color = Color::LIME_GREEN;
-}
 pub(crate) fn update_cell_colors(
     query: Query<(&mut Handle<StandardMaterial>, &MainCube)>,
     mut materials: ResMut<Assets<StandardMaterial>>,
@@ -133,11 +122,11 @@ pub(crate) fn update_cell_colors(
         let query_result = query.get(plane).unwrap();
         let material = materials.get_mut(query_result.0).unwrap();
         if game.selected_cell.map_or(false, |x| x == cell.coords) {
-            select_cell_material(material);
+            materials::select_cell_material(material);
         } else if cell.selected_unit_can_go {
-            mark_can_go_cell_material(material);
+            materials::can_go_cell_material(material);
         } else {
-            normal_cell_material(material);
+            materials::normal_cell_material(material);
         }
     }
 }

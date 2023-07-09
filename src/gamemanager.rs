@@ -1,11 +1,10 @@
 use std::collections::BTreeMap;
 
 use bevy::prelude::*;
-use bevy::utils::petgraph::Direction;
 use bevy_mod_picking::prelude::*;
 
+use crate::materials;
 use crate::scene::{self, MainCube};
-use crate::Vec3i;
 
 #[derive(Resource)]
 pub(crate) struct Game {
@@ -237,13 +236,13 @@ fn on_cell_clicked_play_phase(
     mut game: ResMut<Game>,
 ) {
     let new_selected_material = materials.get_mut(cell_clicked.0).unwrap();
-    crate::scene::select_cell_material(new_selected_material);
+    materials::select_cell_material(new_selected_material);
 
     if let Some(selected_cell) = game.selected_cell {
         if let Some(plane) = game.board.get_cell_mut(selected_cell).unwrap().plane {
             let old_selected = query.get(plane).unwrap();
             let old_selected_material = materials.get_mut(old_selected.0).unwrap();
-            scene::normal_cell_material(old_selected_material);
+            materials::normal_cell_material(old_selected_material);
         }
     }
 
