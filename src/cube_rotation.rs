@@ -5,7 +5,7 @@ use std::f32::consts::PI;
 use std::time::{self, Duration};
 
 #[derive(Default, Debug)]
-struct RotationData {
+pub(crate) struct RotationData {
     target_rotation: Vec3i,
     current_rotation: Vec3i,
     time_started_rotation_y: time::Duration,

@@ -32,11 +32,12 @@ pub(crate) enum GamePhase {
 
 pub(crate) struct Board {
     board: BTreeMap<CellCoordinates, Cell>,
+    units: Vec<Unit>,
     pub(crate) cube_side_length: u32,
 }
 
 impl Board {
-    fn get_cell(&self, coords: CellCoordinates) -> Option<&Cell> {
+    pub(crate) fn get_cell(&self, coords: CellCoordinates) -> Option<&Cell> {
         self.board.get(&coords)
     }
     pub(crate) fn get_cell_mut(&mut self, coords: CellCoordinates) -> Option<&mut Cell> {
@@ -45,8 +46,12 @@ impl Board {
     fn new(cube_side_length: u32) -> Self {
         Board {
             board: BTreeMap::new(),
+            units: Vec::new(),
             cube_side_length,
         }
+    }
+    pub(crate) fn get_unit_at(&self, coords: CellCoordinates) -> Option<&Unit> {
+        self.units.iter().find(|unit| unit.coords == coords)
     }
 
     pub(crate) fn new_cell(&mut self, coords: CellCoordinates) {
@@ -61,7 +66,6 @@ impl Board {
 #[derive(Default, Clone)]
 pub(crate) struct Cell {
     pub(crate) cell_type: CellType,
-    pub(crate) occupant: Option<Unit>,
     pub(crate) plane: Option<Entity>,
     pub(crate) selected_unit_can_go: bool,
     pub(crate) coords: CellCoordinates,
@@ -70,10 +74,6 @@ pub(crate) struct Cell {
 impl Cell {
     pub(crate) fn set_plane(&mut self, plane: Entity) {
         self.plane = Some(plane);
-    }
-
-    pub(crate) fn set_occupant(&mut self, occupant: Unit) {
-        self.occupant = Some(occupant);
     }
 }
 
@@ -87,16 +87,26 @@ pub(crate) enum CellType {
 #[derive(Clone)]
 pub(crate) struct Unit {
     unit_type: UnitType,
-    pub(crate) cell: CellCoordinates,
+    pub(crate) coords: CellCoordinates,
+    /// The physical object that represents this unit
+    entity: Option<Entity>,
 }
 
 impl Unit {
-    fn new(unit_type: UnitType, cell: CellCoordinates) -> Self {
-        Unit { unit_type, cell }
+    fn new(unit_type: UnitType, coords: CellCoordinates) -> Self {
+        Unit {
+            unit_type,
+            coords,
+            entity: None,
+        }
     }
 
     fn where_can_go(&self, cube_side_length: u32) -> Vec<CellCoordinates> {
-        self.cell.get_adjacent(cube_side_length).into()
+        self.coords.get_adjacent(cube_side_length).into()
+    }
+
+    fn set_entity(&mut self, entity: Entity) {
+        self.entity = Some(entity);
     }
 }
 
@@ -197,31 +207,43 @@ impl CellCoordinates {
 
 pub(crate) fn on_cell_clicked(
     In(click): In<ListenedEvent<Click>>,
-    query: Query<(&mut Handle<StandardMaterial>, &MainCube)>,
+    query: Query<(&mut Handle<StandardMaterial>, &MainCube, &Transform)>,
     materials: ResMut<Assets<StandardMaterial>>,
     game: ResMut<Game>,
+    commands: Commands,
+    asset_server: Res<AssetServer>,
 ) -> Bubble {
     let cell_clicked = query.get(click.target).unwrap();
     match game.phase {
         GamePhase::Play => on_cell_clicked_play_phase(cell_clicked, &query, materials, game),
-        GamePhase::PlaceUnits => {
-            on_cell_clicked_place_units_phase(cell_clicked, &query, materials, game)
-        }
+        GamePhase::PlaceUnits => on_cell_clicked_place_units_phase(
+            cell_clicked,
+            &query,
+            materials,
+            game,
+            commands,
+            asset_server,
+        ),
     }
     Bubble::Up
 }
 
 fn on_cell_clicked_place_units_phase(
-    cell_clicked: (&Handle<StandardMaterial>, &MainCube),
-    query: &Query<'_, '_, (&mut Handle<StandardMaterial>, &MainCube)>,
-    materials: ResMut<'_, Assets<StandardMaterial>>,
-    mut game: ResMut<'_, Game>,
+    cell_clicked: (&Handle<StandardMaterial>, &MainCube, &Transform),
+    query: &Query<(&mut Handle<StandardMaterial>, &MainCube, &Transform)>,
+    materials: ResMut<Assets<StandardMaterial>>,
+    mut game: ResMut<Game>,
+    mut commands: Commands,
+    asset_server: Res<AssetServer>,
 ) {
     let game = &mut *game; // Convert game to normal rust reference for partial borrow
-    let cell = game.board.get_cell_mut(cell_clicked.1.coords).unwrap();
-    if cell.occupant.is_none() {
-        if let Some(unit) = game.stored_units.pop() {
-            cell.set_occupant(unit);
+    let coords = cell_clicked.1.coords;
+    if game.board.get_unit_at(coords).is_none() {
+        if let Some(mut unit) = game.stored_units.pop() {
+            if unit.entity.is_none() {
+                spawn_unit_mesh(&mut commands, &mut unit, coords, game, query, asset_server);
+            }
+            game.board.units.push(unit);
         }
     }
     if game.stored_units.is_empty() {
@@ -230,42 +252,40 @@ fn on_cell_clicked_place_units_phase(
 }
 
 fn on_cell_clicked_play_phase(
-    cell_clicked: (&Handle<StandardMaterial>, &MainCube),
-    query: &Query<(&mut Handle<StandardMaterial>, &MainCube)>,
+    cell_clicked: (&Handle<StandardMaterial>, &MainCube, &Transform),
+    query: &Query<(&mut Handle<StandardMaterial>, &MainCube, &Transform)>,
     mut materials: ResMut<Assets<StandardMaterial>>,
     mut game: ResMut<Game>,
 ) {
-    let new_selected_material = materials.get_mut(cell_clicked.0).unwrap();
-    materials::select_cell_material(new_selected_material);
-
-    if let Some(selected_cell) = game.selected_cell {
-        if let Some(plane) = game.board.get_cell_mut(selected_cell).unwrap().plane {
-            let old_selected = query.get(plane).unwrap();
-            let old_selected_material = materials.get_mut(old_selected.0).unwrap();
-            materials::normal_cell_material(old_selected_material);
-        }
-    }
-
-    game.selected_cell = Some(cell_clicked.1.coords);
+    let coords = cell_clicked.1.coords;
+    game.selected_cell = Some(coords);
     let cube_side_length = game.board.cube_side_length;
-    if let Some(selected_cell) = game.selected_cell {
-        if let Some(selected_cell) = game.board.get_cell_mut(selected_cell) {
-            if let Some(occupant) = &selected_cell.occupant {
-                let cells_can_go = occupant.where_can_go(cube_side_length);
-                for cell_can_go in cells_can_go {
-                    mark_cell_can_go(cell_can_go, query, &mut materials, &mut game)
-                }
-            }
+    if let Some(occupant) = game.board.get_unit_at(coords) {
+        // Mark which cells the selected unit can go to
+        let cells_can_go = occupant.where_can_go(cube_side_length);
+        for cell_coords in cells_can_go {
+            let cell = game.board.get_cell_mut(cell_coords).unwrap();
+            cell.selected_unit_can_go = true;
         }
     }
 }
 
-fn mark_cell_can_go(
-    cell_coords: CellCoordinates,
-    query: &Query<(&mut Handle<StandardMaterial>, &MainCube)>,
-    materials: &mut ResMut<Assets<StandardMaterial>>,
-    game: &mut ResMut<Game>,
+pub(crate) fn spawn_unit_mesh(
+    commands: &mut Commands,
+    unit: &mut Unit,
+    coords: CellCoordinates,
+    game: &Game,
+    query: &Query<(&mut Handle<StandardMaterial>, &MainCube, &Transform)>,
+    asset_server: Res<AssetServer>,
 ) {
-    let cell = game.board.get_cell_mut(cell_coords).unwrap();
-    cell.selected_unit_can_go = true;
+    let plane = game
+        .board
+        .get_cell(coords)
+        .unwrap()
+        .plane
+        .expect("No plane entity for Cell");
+    let mut translation = query.get(plane).unwrap().2.translation.clone();
+    translation += coords.normal_direction();
+    let entity = scene::spawn_unit(commands, translation, asset_server);
+    unit.set_entity(entity);
 }

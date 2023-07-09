@@ -1,18 +1,11 @@
-use std::{f32::consts::PI, time::Duration};
 mod cube_rotation;
 mod gamemanager;
 mod materials;
 mod scene;
 mod utils;
 
-use bevy::{
-    prelude::*,
-    render::render_resource::{Extent3d, TextureDimension, TextureFormat},
-};
+use bevy::prelude::*;
 use bevy_mod_picking::prelude::*;
-
-use self::gamemanager::Game;
-use self::scene::construct_cube;
 
 fn main() {
     App::new()
@@ -22,7 +15,7 @@ fn main() {
                 .build()
                 .disable::<DefaultHighlightingPlugin>(),
         )
-        .insert_resource(Game::new(3))
+        .insert_resource(gamemanager::Game::new(3))
         .add_startup_system(setup)
         .add_system(cube_rotation::rotate)
         .add_system(scene::update_cell_colors)
@@ -37,14 +30,14 @@ fn setup(
     mut meshes: ResMut<Assets<Mesh>>,
     mut images: ResMut<Assets<Image>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
-    mut game: ResMut<Game>,
+    mut game: ResMut<gamemanager::Game>,
 ) {
     let material = StandardMaterial {
         base_color: Color::ANTIQUE_WHITE,
         ..default()
     };
 
-    construct_cube(
+    scene::construct_cube(
         game.board.cube_side_length,
         &mut meshes,
         &mut commands,

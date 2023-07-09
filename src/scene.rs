@@ -81,13 +81,11 @@ pub(crate) fn construct_cube(
                 rotation.z -= if rotation.z == 0. { 0. } else { PI };
             }
 
-            let mut material_specific = material.clone();
-            material_specific.base_color.set_r(i as f32);
             let plane = commands
                 .spawn((
                     PbrBundle {
                         mesh: plane_mesh.clone(),
-                        material: materials.add(material_specific),
+                        material: materials.add(material.clone()),
                         transform: Transform::from_translation(translation)
                             .with_scale(Vec3::splat(spacing))
                             .with_rotation(Quat::from_scaled_axis(rotation)),
@@ -129,4 +127,18 @@ pub(crate) fn update_cell_colors(
             materials::normal_cell_material(material);
         }
     }
+}
+
+pub(crate) fn spawn_unit(
+    commands: &mut Commands,
+    translation: Vec3,
+    asset_server: Res<AssetServer>,
+) -> Entity {
+    commands
+        .spawn(SceneBundle {
+            transform: Transform::from_translation(translation),
+            scene: asset_server.load("models/AlienCake/alien.glb#Scene0"),
+            ..default()
+        })
+        .id()
 }
