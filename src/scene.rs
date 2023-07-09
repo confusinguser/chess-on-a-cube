@@ -5,7 +5,7 @@ use std::f32::consts::PI;
 
 use bevy::prelude::Vec3;
 
-use crate::gamemanager::{self, CellCoordinates, Game};
+use crate::gamemanager::{self, Cell, CellCoordinates, Game};
 use crate::materials;
 
 pub(crate) fn construct_cube(
@@ -37,9 +37,9 @@ pub(crate) fn construct_cube(
                     );
                     rotation = Vec3::new(0., 0., 2.); // Up/down rotate 180 degrees, which is 2 turns
                     coords = CellCoordinates::new(
-                        i % side_length,
+                        i % side_length + 1,
                         0,
-                        i / side_length % side_length,
+                        i / side_length % side_length + 1,
                         side % 2 == 0,
                     )
                 }
@@ -51,8 +51,8 @@ pub(crate) fn construct_cube(
                     );
                     rotation = Vec3::new(1., 0., 0.);
                     coords = CellCoordinates::new(
-                        i % side_length,
-                        i / side_length % side_length,
+                        i % side_length + 1,
+                        i / side_length % side_length + 1,
                         0,
                         side % 2 == 0,
                     )
@@ -66,8 +66,8 @@ pub(crate) fn construct_cube(
                     rotation = Vec3::new(0., 0., 1.);
                     coords = CellCoordinates::new(
                         0,
-                        i / side_length % side_length,
-                        i % side_length,
+                        i / side_length % side_length + 1,
+                        i % side_length + 1,
                         side % 2 == 0,
                     )
                 }
@@ -98,8 +98,12 @@ pub(crate) fn construct_cube(
                 ))
                 .id();
 
-            game.board.new_cell(coords);
-            game.board.get_cell_mut(coords).unwrap().set_plane(plane);
+            let cell = Cell {
+                plane: Some(plane),
+                coords,
+                ..Default::default()
+            };
+            game.board.new_cell(coords, cell);
             //lookup_planes.planes[side][i as usize] = Some(plane);
         }
     }
@@ -127,6 +131,7 @@ pub(crate) fn update_cell_colors(
             materials::normal_cell_material(material);
         }
     }
+    dbg!(&game);
 }
 
 pub(crate) fn spawn_unit(

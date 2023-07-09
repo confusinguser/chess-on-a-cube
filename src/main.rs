@@ -23,7 +23,9 @@ fn main() {
 }
 
 #[derive(Component)]
-struct MainCamera;
+struct MainCamera {
+    start_coords: Vec3,
+}
 
 fn setup(
     mut commands: Commands,
@@ -46,16 +48,21 @@ fn setup(
         &mut game,
     );
 
-    commands.spawn(PointLightBundle {
-        point_light: PointLight {
-            intensity: 9000.0,
-            range: 100.,
-            shadows_enabled: true,
+    commands.spawn((
+        PointLightBundle {
+            point_light: PointLight {
+                intensity: 9000.0,
+                range: 100.,
+                shadows_enabled: true,
+                ..default()
+            },
+            transform: Transform::from_xyz(8.0, 16.0, 8.0),
             ..default()
         },
-        transform: Transform::from_xyz(8.0, 16.0, 8.0),
-        ..default()
-    });
+        MainCamera {
+            start_coords: Vec3::new(8., 16., 8.),
+        },
+    ));
 
     commands.spawn((
         Camera3dBundle {
@@ -63,6 +70,8 @@ fn setup(
             ..default()
         },
         RaycastPickCamera::default(), // Enable picking with this camera
-        MainCamera,
+        MainCamera {
+            start_coords: Vec3::new(2., 2., 2.),
+        },
     ));
 }

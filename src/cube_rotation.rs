@@ -13,7 +13,7 @@ pub(crate) struct RotationData {
 }
 
 pub(crate) fn rotate(
-    mut query: Query<&mut Transform, With<MainCamera>>,
+    mut query: Query<(&mut Transform, &MainCamera)>,
     time: Res<Time>,
     input: Res<Input<KeyCode>>,
     mut rotation_data: Local<RotationData>,
@@ -73,13 +73,14 @@ pub(crate) fn rotate(
 
     for mut camera in &mut query {
         let mut rot = Quat::from_euler(EulerRot::XYZ, 0., rotation_needed.y * PI / 2., 0.);
-        camera.translation = Vec3::new(2., 2., 2.);
-        camera.translate_around(Vec3::new(0., 0., 0.), rot);
+        let mut transform = camera.0;
+        transform.translation = camera.1.start_coords;
+        transform.translate_around(Vec3::new(0., 0., 0.), rot);
 
         let up: Vec3;
         let angle = rotation_needed.x * PI / 2.;
         // When spinning around the y-axis we are also spinning the location of the x-axis. We
-        // always want the "x-axis" to be the left face of the cube seen from the camera
+        // always want the "x-axis" to be the left face of the cube seen from the transform
         let mut rotation_parity = rotation_data.current_rotation.y % 4;
         if rotation_parity.is_negative() {
             rotation_parity += 4;
@@ -105,8 +106,9 @@ pub(crate) fn rotate(
                 unreachable!()
             }
         }
-        camera.translate_around(Vec3::new(0., 0., 0.), rot);
-        camera.look_at(Vec3::new(0., 0., 0.), up);
+        transform.translate_around(Vec3::new(0., 0., 0.), rot);
+        transform.look_at(Vec3::new(0., 0., 0.), up);
+        camera.0 = transform;
     }
 }
 
