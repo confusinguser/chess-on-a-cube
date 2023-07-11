@@ -60,6 +60,11 @@ impl Board {
     pub(crate) fn get_all_cells(&self) -> Vec<&Cell> {
         self.board.values().collect()
     }
+
+    #[must_use]
+    pub(crate) fn get_all_cells_mut(&mut self) -> Vec<&mut Cell> {
+        self.board.values_mut().collect()
+    }
 }
 
 #[derive(Default, Clone, Debug)]
@@ -149,40 +154,63 @@ impl CellCoordinates {
             if normal == direction || normal == direction * -1. {
                 continue; // We ignore directions which would go out of and into the cube
             }
-            i += 1;
+            if i >= 4 {
+                warn!("More than 4 directions in get_adjacent => No zero-field in CellCoordinate");
+                break;
+            }
 
             let mut adjacent = *self;
-            let mut x = adjacent.x as i32 + direction.x as i32;
-            let mut y = adjacent.y as i32 + direction.y as i32;
-            let mut z = adjacent.z as i32 + direction.z as i32;
-            for c in [x, y, z].iter_mut() {
-                if *c < 0 {
-                    adjacent.normal_is_positive = false;
-                    *c = 0;
-                } else if *c >= cube_side_length as i32 {
-                    adjacent.normal_is_positive = true;
-                    *c = cube_side_length as i32;
-                }
-                let set_to = if self.normal_is_positive {
-                    (cube_side_length - 1) as i32
+            let mut relevant_coordinate;
+            if direction.x != 0. {
+                relevant_coordinate = adjacent.x as i32 + direction.x as i32;
+            } else if direction.y != 0. {
+                relevant_coordinate = adjacent.y as i32 + direction.y as i32;
+            } else if direction.z != 0. {
+                relevant_coordinate = adjacent.z as i32 + direction.z as i32;
+            } else {
+                unreachable!();
+            };
+            let mut folded_to_other_face = false;
+            // We start counting coordinates at 1 since 0 represents on the plane
+            if relevant_coordinate <= 0 {
+                adjacent.normal_is_positive = false;
+                relevant_coordinate = 0;
+                folded_to_other_face = true;
+            } else if relevant_coordinate > cube_side_length as i32 {
+                adjacent.normal_is_positive = true;
+                relevant_coordinate = 0;
+                folded_to_other_face = true;
+            }
+
+            if folded_to_other_face {
+                let set_old_normal_to = if self.normal_is_positive {
+                    cube_side_length
                 } else {
-                    0
+                    1
                 };
-                // Set the right coordinate along the old normal vector
+
+                // Set the correct coordinate along the old normal vector
                 if normal.x != 0. {
-                    x = set_to;
+                    adjacent.x = set_old_normal_to;
                 };
                 if normal.y != 0. {
-                    y = set_to;
+                    adjacent.y = set_old_normal_to;
                 };
                 if normal.z != 0. {
-                    z = set_to;
+                    adjacent.z = set_old_normal_to;
                 };
             }
-            adjacent.x = x as u32;
-            adjacent.y = y as u32;
-            adjacent.z = z as u32;
+
+            if direction.x != 0. {
+                adjacent.x = relevant_coordinate as u32;
+            } else if direction.y != 0. {
+                adjacent.y = relevant_coordinate as u32;
+            } else if direction.z != 0. {
+                adjacent.z = relevant_coordinate as u32;
+            }
+
             output[i] = adjacent;
+            i += 1;
         }
         output
     }
@@ -248,15 +276,28 @@ fn on_cell_clicked_play_phase(
     mut game: ResMut<Game>,
 ) {
     let coords = cell_clicked.1.coords;
+    dbg!(coords);
     game.selected_cell = Some(coords);
+    reset_cells_new_selection(&mut game);
     let cube_side_length = game.board.cube_side_length;
     if let Some(occupant) = game.board.get_unit_at(coords) {
         // Mark which cells the selected unit can go to
         let cells_can_go = occupant.where_can_go(cube_side_length);
         for cell_coords in cells_can_go {
-            let cell = game.board.get_cell_mut(cell_coords).unwrap();
-            cell.selected_unit_can_go = true;
+            let cell = game.board.get_cell_mut(cell_coords);
+            match cell {
+                None => {
+                    warn!("Cell {:?} doesn't exist", cell_coords);
+                }
+                Some(cell) => cell.selected_unit_can_go = true,
+            }
         }
+    }
+}
+
+fn reset_cells_new_selection(game: &mut Game) {
+    for cell in game.board.get_all_cells_mut() {
+        cell.selected_unit_can_go = false;
     }
 }
 
@@ -275,7 +316,9 @@ pub(crate) fn spawn_unit_mesh(
         .plane
         .expect("No plane entity for Cell");
     let mut translation = query.get(plane).unwrap().2.translation;
-    translation += coords.normal_direction();
-    let entity = scene::spawn_unit(commands, translation, asset_server);
+    let scale = 1. / game.board.cube_side_length as f32 / 3.;
+    translation += coords.normal_direction() * scale;
+    let transform = Transform::from_translation(translation).with_scale(Vec3::splat(scale));
+    let entity = scene::spawn_unit(commands, transform, asset_server);
     unit.set_entity(entity);
 }

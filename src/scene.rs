@@ -1,4 +1,3 @@
-use bevy::math::vec4;
 use bevy::prelude::*;
 use bevy_mod_picking::prelude::*;
 use std::f32::consts::PI;
@@ -27,6 +26,7 @@ pub(crate) fn construct_cube(
         for i in 0..side_length.pow(2) {
             let translation;
             let mut rotation;
+            #[allow(clippy::needless_late_init)]
             let coords;
             match side {
                 0 | 1 => {
@@ -54,7 +54,7 @@ pub(crate) fn construct_cube(
                         i % side_length + 1,
                         i / side_length % side_length + 1,
                         0,
-                        side % 2 == 0,
+                        side % 2 == 1,
                     )
                 }
                 4 | 5 => {
@@ -113,6 +113,7 @@ pub(crate) fn construct_cube(
 pub(crate) struct MainCube {
     pub(crate) coords: CellCoordinates,
 }
+
 pub(crate) fn update_cell_colors(
     query: Query<(&mut Handle<StandardMaterial>, &MainCube)>,
     mut materials: ResMut<Assets<StandardMaterial>>,
@@ -131,18 +132,17 @@ pub(crate) fn update_cell_colors(
             materials::normal_cell_material(material);
         }
     }
-    dbg!(&game);
 }
 
 pub(crate) fn spawn_unit(
     commands: &mut Commands,
-    translation: Vec3,
+    transform: Transform,
     asset_server: Res<AssetServer>,
 ) -> Entity {
     commands
         .spawn(SceneBundle {
-            transform: Transform::from_translation(translation),
-            scene: asset_server.load("models/AlienCake/alien.glb#Scene0"),
+            transform,
+            scene: asset_server.load("models/unit.glb#Scene0"),
             ..default()
         })
         .id()

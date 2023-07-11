@@ -4,12 +4,20 @@ mod materials;
 mod scene;
 mod utils;
 
+use bevy::log::*;
 use bevy::prelude::*;
 use bevy_mod_picking::prelude::*;
 
 fn main() {
     App::new()
-        .add_plugins(DefaultPlugins.set(ImagePlugin::default_nearest()))
+        .add_plugins(
+            DefaultPlugins
+                .set(ImagePlugin::default_nearest())
+                .set(LogPlugin {
+                    level: Level::WARN,
+                    ..default()
+                }),
+        )
         .add_plugins(
             DefaultPickingPlugins
                 .build()
