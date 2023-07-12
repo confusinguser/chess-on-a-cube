@@ -1,4 +1,5 @@
 use bevy::prelude::*;
+use bevy::scene::SceneInstance;
 use bevy_mod_picking::prelude::*;
 use std::f32::consts::PI;
 
@@ -130,21 +131,46 @@ pub(crate) fn update_cell_colors(
     }
 }
 
+/// A "flag" to make a separate system add the pickable tasks to our unit entities
+#[derive(Component, Default, Debug)]
+pub(crate) struct AddPickable;
+
 pub(crate) fn spawn_unit(
     commands: &mut Commands,
     transform: Transform,
     asset_server: Res<AssetServer>,
 ) -> Entity {
-    commands
+    let entity = commands
         .spawn((
             SceneBundle {
                 transform,
                 scene: asset_server.load("models/unit.glb#Scene0"),
                 ..default()
             },
-            PickableBundle::default(),
-            RaycastPickTarget::default(),
-            OnPointer::<Click>::run_callback(gamemanager::on_unit_clicked),
+            AddPickable,
         ))
-        .id()
+        .id();
+    entity
+}
+
+pub(crate) fn add_pickable_to_unit(
+    mut commands: Commands,
+    unloaded_instances: Query<(Entity, &SceneInstance), With<AddPickable>>,
+    handles: Query<Entity>,
+    scene_manager: Res<SceneSpawner>,
+) {
+    for (entity, instance) in unloaded_instances.iter() {
+        if scene_manager.instance_is_ready(**instance) {
+            commands.entity(entity).remove::<AddPickable>();
+            // Iterate over all entities in scene (once it's loaded)
+            let handles = handles.iter_many(scene_manager.iter_instance_entities(**instance));
+            for entity in handles {
+                commands.entity(entity).insert((
+                    PickableBundle::default(),
+                    RaycastPickTarget::default(),
+                    OnPointer::<Click>::run_callback(gamemanager::on_unit_clicked),
+                ));
+            }
+        }
+    }
 }

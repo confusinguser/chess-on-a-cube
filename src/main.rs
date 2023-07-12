@@ -27,6 +27,7 @@ fn main() {
         .add_startup_system(setup)
         .add_system(cube_rotation::rotate)
         .add_system(scene::update_cell_colors)
+        .add_system(scene::add_pickable_to_unit.run_if(any_with_component::<scene::AddPickable>()))
         .run();
 }
 
@@ -68,7 +69,7 @@ fn setup(
             ..default()
         },
         MainCamera {
-            start_coords: Vec3::new(8., 16., 8.),
+            start_coords: Vec3::new(12., 16., 8.),
         },
     ));
 

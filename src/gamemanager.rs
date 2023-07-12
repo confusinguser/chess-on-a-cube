@@ -1,6 +1,7 @@
 use std::collections::BTreeMap;
 
 use bevy::prelude::*;
+use bevy::scene::SceneInstance;
 use bevy_mod_picking::prelude::*;
 
 use crate::scene::{self, MainCube};
@@ -259,10 +260,11 @@ impl CellCoordinates {
 pub(crate) fn on_cell_clicked(
     In(click): In<ListenedEvent<Click>>,
     mut query: Query<(Option<&MainCube>, &mut Transform)>,
-    game: ResMut<Game>,
+    mut game: ResMut<Game>,
     commands: Commands,
     asset_server: Res<AssetServer>,
 ) -> Bubble {
+    let game = &mut *game;
     match game.phase {
         GamePhase::Play => on_cell_clicked_play_phase(click.target, &mut query, game),
         GamePhase::PlaceUnits => on_cell_clicked_place_units_phase(
@@ -279,7 +281,7 @@ pub(crate) fn on_cell_clicked(
 fn on_cell_clicked_place_units_phase(
     target: Entity,
     query: &mut Query<(Option<&MainCube>, &mut Transform)>,
-    mut game: ResMut<Game>,
+    game: &mut Game,
     mut commands: Commands,
     asset_server: Res<AssetServer>,
 ) {
@@ -313,9 +315,8 @@ fn on_cell_clicked_place_units_phase(
 fn on_cell_clicked_play_phase(
     target: Entity,
     query: &mut Query<(Option<&MainCube>, &mut Transform)>,
-    mut game: ResMut<Game>,
+    mut game: &mut Game,
 ) {
-    let mut game = &mut *game;
     let cell_clicked = query.get(target);
     let coords;
     if let Ok(cell_clicked) = cell_clicked {
@@ -401,17 +402,27 @@ pub(crate) fn move_unit(
 
     query.get_mut(unit.entity.unwrap()).unwrap().1.translation = target_translation;
 }
+
+//TODO fix
 pub(crate) fn on_unit_clicked(
     In(click): In<ListenedEvent<Click>>,
+    scene_query: Query<(Entity, &SceneInstance)>,
     mut query: Query<(Option<&MainCube>, &mut Transform)>,
-    game: ResMut<Game>,
+    mut game: ResMut<Game>,
+    scene_manager: Res<SceneSpawner>,
 ) -> Bubble {
+    let game = &mut *game;
     if game.phase == GamePhase::Play {
         if let Some(unit) = game.units.get_unit_from_entity(click.target) {
             if let Some(cell) = game.board.get_cell(unit.coords) {
+                dbg!(&cell.plane, &query);
                 on_cell_clicked_play_phase(cell.plane, &mut query, game);
+            } else {
+                warn!("Cell is None");
             }
+        } else {
+            warn!("Unit is None");
         }
     }
-    Bubble::Up
+    Bubble::Burst
 }
