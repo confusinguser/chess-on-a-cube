@@ -98,11 +98,7 @@ pub(crate) fn construct_cube(
                 ))
                 .id();
 
-            let cell = Cell {
-                plane: Some(plane),
-                coords,
-                ..Default::default()
-            };
+            let cell = Cell::new(plane, coords);
             game.board.new_cell(coords, cell);
             //lookup_planes.planes[side][i as usize] = Some(plane);
         }
@@ -120,7 +116,7 @@ pub(crate) fn update_cell_colors(
     game: ResMut<Game>,
 ) {
     for cell in game.board.get_all_cells() {
-        let plane = cell.plane.unwrap();
+        let plane = cell.plane;
 
         let query_result = query.get(plane).unwrap();
         let material = materials.get_mut(query_result.0).unwrap();
@@ -140,10 +136,15 @@ pub(crate) fn spawn_unit(
     asset_server: Res<AssetServer>,
 ) -> Entity {
     commands
-        .spawn(SceneBundle {
-            transform,
-            scene: asset_server.load("models/unit.glb#Scene0"),
-            ..default()
-        })
+        .spawn((
+            SceneBundle {
+                transform,
+                scene: asset_server.load("models/unit.glb#Scene0"),
+                ..default()
+            },
+            PickableBundle::default(),
+            RaycastPickTarget::default(),
+            OnPointer::<Click>::run_callback(gamemanager::on_unit_clicked),
+        ))
         .id()
 }

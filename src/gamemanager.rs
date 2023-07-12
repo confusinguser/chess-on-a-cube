@@ -8,6 +8,7 @@ use crate::scene::{self, MainCube};
 #[derive(Resource, Debug)]
 pub(crate) struct Game {
     pub(crate) board: Board,
+    pub(crate) units: Units,
     pub(crate) selected_cell: Option<CellCoordinates>,
     pub(crate) phase: GamePhase,
     pub(crate) stored_units: Vec<Unit>,
@@ -16,10 +17,34 @@ impl Game {
     pub(crate) fn new(cube_side_length: u32) -> Self {
         Game {
             board: Board::new(cube_side_length),
+            units: Default::default(),
             selected_cell: None,
             phase: GamePhase::PlaceUnits,
             stored_units: vec![Unit::new(UnitType::Normal, CellCoordinates::default())],
         }
+    }
+}
+
+#[derive(Debug, Default)]
+pub(crate) struct Units {
+    units: Vec<Unit>,
+}
+
+impl Units {
+    pub(crate) fn get_unit(&self, coords: CellCoordinates) -> Option<&Unit> {
+        self.units.iter().find(|unit| unit.coords == coords)
+    }
+    pub(crate) fn get_unit_mut(&mut self, coords: CellCoordinates) -> Option<&mut Unit> {
+        self.units.iter_mut().find(|unit| unit.coords == coords)
+    }
+    pub(crate) fn get_unit_from_entity(&self, entity: Entity) -> Option<&Unit> {
+        self.units.iter().find(|unit| {
+            if let Some(unit_entity) = unit.entity {
+                unit_entity == entity
+            } else {
+                false
+            }
+        })
     }
 }
 
@@ -28,10 +53,10 @@ pub(crate) enum GamePhase {
     PlaceUnits,
     Play,
 }
+
 #[derive(Debug)]
 pub(crate) struct Board {
     board: BTreeMap<CellCoordinates, Cell>,
-    units: Vec<Unit>,
     pub(crate) cube_side_length: u32,
 }
 
@@ -45,12 +70,8 @@ impl Board {
     fn new(cube_side_length: u32) -> Self {
         Board {
             board: BTreeMap::new(),
-            units: Vec::new(),
             cube_side_length,
         }
-    }
-    pub(crate) fn get_unit_at(&self, coords: CellCoordinates) -> Option<&Unit> {
-        self.units.iter().find(|unit| unit.coords == coords)
     }
 
     pub(crate) fn new_cell(&mut self, coords: CellCoordinates, cell: Cell) {
@@ -67,17 +88,22 @@ impl Board {
     }
 }
 
-#[derive(Default, Clone, Debug)]
+#[derive(Clone, Debug)]
 pub(crate) struct Cell {
     pub(crate) cell_type: CellType,
-    pub(crate) plane: Option<Entity>,
+    pub(crate) plane: Entity,
     pub(crate) selected_unit_can_go: bool,
     pub(crate) coords: CellCoordinates,
 }
 
 impl Cell {
-    pub(crate) fn set_plane(&mut self, plane: Entity) {
-        self.plane = Some(plane);
+    pub(crate) fn new(plane: Entity, coords: CellCoordinates) -> Self {
+        Self {
+            plane,
+            coords,
+            selected_unit_can_go: default(),
+            cell_type: default(),
+        }
     }
 }
 
@@ -92,7 +118,7 @@ pub(crate) enum CellType {
 pub(crate) struct Unit {
     unit_type: UnitType,
     pub(crate) coords: CellCoordinates,
-    /// The physical object that represents this unit
+    /// The entity that represents this unit
     entity: Option<Entity>,
 }
 
@@ -232,37 +258,51 @@ impl CellCoordinates {
 
 pub(crate) fn on_cell_clicked(
     In(click): In<ListenedEvent<Click>>,
-    query: Query<(&mut Handle<StandardMaterial>, &MainCube, &Transform)>,
+    mut query: Query<(Option<&MainCube>, &mut Transform)>,
     game: ResMut<Game>,
     commands: Commands,
     asset_server: Res<AssetServer>,
 ) -> Bubble {
-    let cell_clicked = query.get(click.target).unwrap();
     match game.phase {
-        GamePhase::Play => on_cell_clicked_play_phase(cell_clicked, &query, game),
-        GamePhase::PlaceUnits => {
-            on_cell_clicked_place_units_phase(cell_clicked, &query, game, commands, asset_server)
-        }
+        GamePhase::Play => on_cell_clicked_play_phase(click.target, &mut query, game),
+        GamePhase::PlaceUnits => on_cell_clicked_place_units_phase(
+            click.target,
+            &mut query,
+            game,
+            commands,
+            asset_server,
+        ),
     }
     Bubble::Up
 }
 
 fn on_cell_clicked_place_units_phase(
-    cell_clicked: (&Handle<StandardMaterial>, &MainCube, &Transform),
-    query: &Query<(&mut Handle<StandardMaterial>, &MainCube, &Transform)>,
+    target: Entity,
+    query: &mut Query<(Option<&MainCube>, &mut Transform)>,
     mut game: ResMut<Game>,
     mut commands: Commands,
     asset_server: Res<AssetServer>,
 ) {
     let game = &mut *game; // Convert game to normal rust reference for partial borrow
-    let coords = cell_clicked.1.coords;
-    if game.board.get_unit_at(coords).is_none() {
+    let cell_clicked = query.get(target);
+    let coords;
+    if let Ok(cell_clicked) = cell_clicked {
+        if cell_clicked.0.is_none() {
+            // Didn't click a part of the cube
+            return;
+        }
+        coords = cell_clicked.0.unwrap().coords;
+    } else {
+        return;
+    }
+
+    if game.units.get_unit(coords).is_none() {
         if let Some(mut unit) = game.stored_units.pop() {
             if unit.entity.is_none() {
-                spawn_unit_mesh(&mut commands, &mut unit, coords, game, query, asset_server);
+                spawn_unit_entity(&mut commands, &mut unit, coords, game, query, asset_server);
                 unit.coords = coords;
             }
-            game.board.units.push(unit);
+            game.units.units.push(unit);
         }
     }
     if game.stored_units.is_empty() {
@@ -271,18 +311,39 @@ fn on_cell_clicked_place_units_phase(
 }
 
 fn on_cell_clicked_play_phase(
-    cell_clicked: (&Handle<StandardMaterial>, &MainCube, &Transform),
-    query: &Query<(&mut Handle<StandardMaterial>, &MainCube, &Transform)>,
+    target: Entity,
+    query: &mut Query<(Option<&MainCube>, &mut Transform)>,
     mut game: ResMut<Game>,
 ) {
-    let coords = cell_clicked.1.coords;
+    let mut game = &mut *game;
+    let cell_clicked = query.get(target);
+    let coords;
+    if let Ok(cell_clicked) = cell_clicked {
+        if cell_clicked.0.is_none() {
+            // Didn't click a part of the cube
+            return;
+        }
+        coords = cell_clicked.0.unwrap().coords;
+    } else {
+        return;
+    }
+
     dbg!(coords);
+    let cell = game.board.get_cell_mut(coords).unwrap();
+
+    if cell.selected_unit_can_go && game.selected_cell.is_some() {
+        move_unit(coords, game, query);
+        let unit = game.units.get_unit_mut(game.selected_cell.unwrap());
+        if let Some(mut unit) = unit {
+            unit.coords = coords; // Set coords of unit on old selected cell to clicked cell
+        }
+    }
+
     game.selected_cell = Some(coords);
-    reset_cells_new_selection(&mut game);
-    let cube_side_length = game.board.cube_side_length;
-    if let Some(occupant) = game.board.get_unit_at(coords) {
+    reset_cells_new_selection(game);
+    if let Some(occupant) = game.units.get_unit(coords) {
         // Mark which cells the selected unit can go to
-        let cells_can_go = occupant.where_can_go(cube_side_length);
+        let cells_can_go = occupant.where_can_go(game.board.cube_side_length);
         for cell_coords in cells_can_go {
             let cell = game.board.get_cell_mut(cell_coords);
             match cell {
@@ -301,24 +362,56 @@ fn reset_cells_new_selection(game: &mut Game) {
     }
 }
 
-pub(crate) fn spawn_unit_mesh(
+pub(crate) fn spawn_unit_entity(
     commands: &mut Commands,
     unit: &mut Unit,
     coords: CellCoordinates,
     game: &Game,
-    query: &Query<(&mut Handle<StandardMaterial>, &MainCube, &Transform)>,
+    query: &mut Query<(Option<&MainCube>, &mut Transform)>,
     asset_server: Res<AssetServer>,
 ) {
-    let plane = game
-        .board
-        .get_cell(coords)
-        .unwrap()
-        .plane
-        .expect("No plane entity for Cell");
-    let mut translation = query.get(plane).unwrap().2.translation;
+    let plane = game.board.get_cell(coords).unwrap().plane;
+    let mut translation = query.get(plane).unwrap().1.translation;
     let scale = 1. / game.board.cube_side_length as f32 / 3.;
     translation += coords.normal_direction() * scale;
     let transform = Transform::from_translation(translation).with_scale(Vec3::splat(scale));
     let entity = scene::spawn_unit(commands, transform, asset_server);
     unit.set_entity(entity);
+}
+
+pub(crate) fn move_unit(
+    coords: CellCoordinates,
+    game: &mut Game,
+    query: &mut Query<(Option<&MainCube>, &mut Transform)>,
+) {
+    let unit = game.units.get_unit_mut(game.selected_cell.unwrap());
+    if unit.is_none() {
+        return;
+    }
+
+    let unit = unit.unwrap();
+    if unit.entity.is_none() {
+        return;
+    }
+
+    let plane = game.board.get_cell(coords).unwrap().plane;
+    let mut target_translation = query.get(plane).unwrap().1.translation;
+    let scale = 1. / game.board.cube_side_length as f32 / 3.;
+    target_translation += coords.normal_direction() * scale;
+
+    query.get_mut(unit.entity.unwrap()).unwrap().1.translation = target_translation;
+}
+pub(crate) fn on_unit_clicked(
+    In(click): In<ListenedEvent<Click>>,
+    mut query: Query<(Option<&MainCube>, &mut Transform)>,
+    game: ResMut<Game>,
+) -> Bubble {
+    if game.phase == GamePhase::Play {
+        if let Some(unit) = game.units.get_unit_from_entity(click.target) {
+            if let Some(cell) = game.board.get_cell(unit.coords) {
+                on_cell_clicked_play_phase(cell.plane, &mut query, game);
+            }
+        }
+    }
+    Bubble::Up
 }

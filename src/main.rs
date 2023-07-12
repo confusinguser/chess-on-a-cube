@@ -64,7 +64,7 @@ fn setup(
                 shadows_enabled: true,
                 ..default()
             },
-            transform: Transform::from_xyz(8.0, 16.0, 8.0),
+            transform: Transform::from_xyz(8.0, 8.0, 8.0),
             ..default()
         },
         MainCamera {
