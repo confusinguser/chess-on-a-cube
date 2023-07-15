@@ -65,12 +65,12 @@ fn setup(
                 shadows_enabled: true,
                 ..default()
             },
-            transform: Transform::from_xyz(8.0, 8.0, 8.0),
+            transform: Transform::from_xyz(12., 16., 8.),
             ..default()
         },
-        MainCamera {
-            start_coords: Vec3::new(12., 16., 8.),
-        },
+        //MainCamera {
+        //    start_coords: Vec3::new(12., 16., 8.),
+        //},
     ));
 
     commands.spawn((

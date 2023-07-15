@@ -9,6 +9,7 @@ pub(crate) struct RotationData {
     target_rotation: Quat,
     current_rotation: Quat,
     time_started_rotations: [Duration; 3],
+    reversed_axes: [bool; 3],
 }
 
 pub(crate) fn rotate(
@@ -20,7 +21,6 @@ pub(crate) fn rotate(
     let time = &*time;
     let mut rotation_data = &mut *rotation_data;
     let rotation_duration = 1.0;
-
     macro_rules! input_handling {
         ($keycode:expr, $axis:expr) => {
             if input.just_pressed($keycode) {
@@ -30,65 +30,65 @@ pub(crate) fn rotate(
                     new_axis_on_side_after_rotation($axis, rotation_data.current_rotation) * PI / 2.;
                 let axis_num = utils::first_nonzero_component(axis).unwrap() as usize;
                 if rotation_data.time_started_rotations[axis_num].is_zero() {
-                    rotation_data.target_rotation *=
-                        Quat::from_euler(EulerRot::XYZ, axis.x, axis.y, axis.z);
+                    rotation_data.reversed_axes[axis_num] = axis[axis_num] < 0.;
+                    rotation_data.target_rotation *= Quat::from_euler(EulerRot::XYZ, axis.x, axis.y, axis.z);
                     rotation_data.time_started_rotations[axis_num] = time.elapsed();
                 }
             }
-        };
+        }
     }
 
     // Input
-    input_handling!(KeyCode::Left, Vec3::Y);
-    input_handling!(KeyCode::Right, -Vec3::Y);
+    input_handling!(KeyCode::Left, -Vec3::Y);
+    input_handling!(KeyCode::Right, Vec3::Y);
     input_handling!(KeyCode::Down, Vec3::Z);
     input_handling!(KeyCode::Up, -Vec3::Z);
 
     let mut rotation_needed = rotation_data.current_rotation;
 
     // Animate world axes
+    // x-axis
     animate_axis(
         time,
-        &mut rotation_data.time_started_rotations[1],
-        rotation_data.target_rotation,
+        &mut rotation_data.time_started_rotations[0],
         &mut rotation_data.current_rotation,
         rotation_duration,
         EulerRot::XYZ,
         &mut rotation_needed,
+        rotation_data.reversed_axes[0],
     );
+    // y-axis
     animate_axis(
         time,
-        &mut rotation_data.time_started_rotations[0],
-        rotation_data.target_rotation,
+        &mut rotation_data.time_started_rotations[1],
         &mut rotation_data.current_rotation,
         rotation_duration,
         EulerRot::YXZ,
         &mut rotation_needed,
+        rotation_data.reversed_axes[1],
     );
+    // z-axis
     animate_axis(
         time,
         &mut rotation_data.time_started_rotations[2],
-        rotation_data.target_rotation,
         &mut rotation_data.current_rotation,
         rotation_duration,
-        EulerRot::XZY,
+        EulerRot::ZXY,
         &mut rotation_needed,
+        rotation_data.reversed_axes[2],
     );
 
-    //dbg!(&rotation_data, &rotation_needed);
+    /*dbg!(
+        &rotation_data.target_rotation.to_euler(EulerRot::YXZ),
+        &rotation_data.current_rotation.to_euler(EulerRot::YXZ),
+        &rotation_needed.to_euler(EulerRot::YXZ)
+    );*/
 
     // Apply the rotation
     for mut camera in &mut query {
-        let rot = Quat::from_euler(
-            EulerRot::XYZ,
-            rotation_needed.x * PI / 2.,
-            rotation_needed.y * PI / 2.,
-            rotation_needed.z * PI / 2.,
-        );
-
         let mut transform = camera.0;
         transform.translation = camera.1.start_coords;
-        transform.translate_around(Vec3::new(0., 0., 0.), rot);
+        transform.translate_around(Vec3::new(0., 0., 0.), rotation_needed);
 
         /*        let up;
         let mut rotation_parity = rotation_data.current_rotation.y % 4;
@@ -158,27 +158,26 @@ fn new_axis_on_side_after_rotation(normal_of_side: Vec3, rot: Quat) -> Vec3 {
 fn animate_axis(
     time: &Time,
     time_started_rotation: &mut Duration,
-    target_rotation: Quat,
     current_rotation: &mut Quat,
     rotation_duration: f32,
     axis: EulerRot,
     rotation_needed: &mut Quat,
+    reversed: bool,
 ) {
     if time_started_rotation.is_zero() {
         return; // No rotation happening on axis
     }
     let time_elapsed = time.elapsed() - time_started_rotation.to_owned();
-    let rotation_amount = if target_rotation.y > current_rotation.y {
-        1.
-    } else {
-        -1.
-    } * rotation_curve(time_elapsed.as_secs_f32() / rotation_duration)
+    let rotation_amount = if reversed { -1. } else { 1. }
+        * rotation_curve(time_elapsed.as_secs_f32() / rotation_duration)
         * PI
         / 2.;
 
-    *rotation_needed *= Quat::from_euler(axis, 0., rotation_amount, 0.);
+    *rotation_needed *= Quat::from_euler(axis, rotation_amount, 0., 0.);
+
     if time_elapsed.as_secs_f32() > rotation_duration {
         *time_started_rotation = Duration::default();
-        *current_rotation *= Quat::from_euler(axis, 0., PI / 2., 0.);
+        *current_rotation *=
+            Quat::from_euler(axis, if reversed { -1. } else { 1. } * PI / 2., 0., 0.);
     }
 }
