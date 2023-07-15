@@ -2,6 +2,7 @@ mod cube_rotation;
 mod gamemanager;
 mod materials;
 mod scene;
+mod units;
 mod utils;
 
 use bevy::log::*;

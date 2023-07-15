@@ -1,12 +1,11 @@
-use crate::utils::{self, Vec3i};
+use crate::utils;
 use crate::MainCamera;
 use bevy::prelude::*;
 use std::f32::consts::PI;
-use std::time::{self, Duration};
+use std::time::Duration;
 
 #[derive(Default, Debug)]
 pub(crate) struct RotationData {
-    target_rotation: Quat,
     current_rotation: Quat,
     time_started_rotations: [Duration; 3],
     reversed_axes: [bool; 3],
@@ -26,12 +25,16 @@ pub(crate) fn rotate(
             if input.just_pressed($keycode) {
                 // When spinning around the y-axis we are also spinning the location of the x-axis. We
                 // always want the "x-axis" to be the left face of the cube seen from the camera
-                let axis =
+                let mut axis =
                     new_axis_on_side_after_rotation($axis, rotation_data.current_rotation) * PI / 2.;
-                let axis_num = utils::first_nonzero_component(axis).unwrap() as usize;
+                let mut axis_num = utils::first_nonzero_component(axis).unwrap() as usize;
+                if axis_num == 2 {
+                    axis = Vec3::new(axis[axis_num],0.,0.);
+                    axis_num = 0;
+                }
+                dbg!(axis, axis_num);
                 if rotation_data.time_started_rotations[axis_num].is_zero() {
                     rotation_data.reversed_axes[axis_num] = axis[axis_num] < 0.;
-                    rotation_data.target_rotation *= Quat::from_euler(EulerRot::XYZ, axis.x, axis.y, axis.z);
                     rotation_data.time_started_rotations[axis_num] = time.elapsed();
                 }
             }
@@ -77,12 +80,6 @@ pub(crate) fn rotate(
         &mut rotation_needed,
         rotation_data.reversed_axes[2],
     );
-
-    /*dbg!(
-        &rotation_data.target_rotation.to_euler(EulerRot::YXZ),
-        &rotation_data.current_rotation.to_euler(EulerRot::YXZ),
-        &rotation_needed.to_euler(EulerRot::YXZ)
-    );*/
 
     // Apply the rotation
     for mut camera in &mut query {
@@ -179,5 +176,8 @@ fn animate_axis(
         *time_started_rotation = Duration::default();
         *current_rotation *=
             Quat::from_euler(axis, if reversed { -1. } else { 1. } * PI / 2., 0., 0.);
+        dbg!(current_rotation.to_euler(EulerRot::XYZ),);
+        dbg!(current_rotation.to_euler(EulerRot::YXZ),);
+        dbg!(current_rotation.to_euler(EulerRot::ZXY),);
     }
 }

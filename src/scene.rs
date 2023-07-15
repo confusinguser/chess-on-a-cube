@@ -5,7 +5,7 @@ use std::f32::consts::PI;
 
 use bevy::prelude::Vec3;
 
-use crate::gamemanager::{self, Cell, CellCoordinates, Game};
+use crate::gamemanager::{self, Cell, CellCoordinates, Game, GamePhase};
 use crate::materials;
 
 pub(crate) fn construct_cube(
@@ -123,7 +123,17 @@ pub(crate) fn update_cell_colors(
         let material = materials.get_mut(query_result.0).unwrap();
         if game.selected_cell.map_or(false, |x| x == cell.coords) {
             materials::select_cell_material(material);
-        } else if cell.selected_unit_can_go {
+        } else if cell.selected_unit_can_attack
+            && game
+                .units
+                .get_unit(cell.coords)
+                .map_or(false, |unit| match game.phase {
+                    GamePhase::Play(turn) => unit.team != turn,
+                    _ => false,
+                })
+        {
+            materials::can_attack_cell_material(material);
+        } else if cell.selected_unit_distance.is_some() {
             materials::can_go_cell_material(material);
         } else {
             materials::normal_cell_material(material);
@@ -139,12 +149,13 @@ pub(crate) fn spawn_unit(
     commands: &mut Commands,
     transform: Transform,
     asset_server: Res<AssetServer>,
+    model_name: &str,
 ) -> Entity {
     let entity = commands
         .spawn((
             SceneBundle {
                 transform,
-                scene: asset_server.load("models/unit.glb#Scene0"),
+                scene: asset_server.load(format!("models/{}.glb#Scene0", model_name)),
                 ..default()
             },
             AddPickable,
@@ -173,4 +184,8 @@ pub(crate) fn add_pickable_to_unit(
             }
         }
     }
+}
+
+pub(crate) fn kill_unit(commands: &mut Commands, entity: Entity) {
+    commands.entity(entity).despawn();
 }
