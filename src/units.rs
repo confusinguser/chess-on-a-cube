@@ -1,4 +1,5 @@
-use crate::gamemanager::{Board, CellCoordinates, Team};
+use crate::cell::{Board, CellCoordinates};
+use crate::gamemanager::Team;
 use bevy::prelude::*;
 
 #[derive(Clone, Debug)]
@@ -59,20 +60,6 @@ pub(crate) enum UnitType {
 }
 
 impl UnitType {
-    fn starting_hp(&self) -> i32 {
-        match self {
-            Self::Melee => 4,
-            Self::Laser => 2,
-        }
-    }
-
-    pub(crate) fn damage(&self) -> i32 {
-        match self {
-            Self::Melee => 2,
-            Self::Laser => 1,
-        }
-    }
-
     pub(crate) fn range(&self) -> u32 {
         match self {
             Self::Melee => 2,

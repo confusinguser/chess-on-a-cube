@@ -5,7 +5,8 @@ use std::f32::consts::PI;
 
 use bevy::prelude::Vec3;
 
-use crate::gamemanager::{self, Cell, CellColor, CellCoordinates, Game};
+use crate::cell::{Cell, CellColor, CellCoordinates};
+use crate::gamemanager::{self, Game};
 use crate::materials;
 
 pub(crate) fn construct_cube(

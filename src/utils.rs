@@ -29,7 +29,7 @@ pub(crate) fn vectors_shared_component_sign(v1: Vec3, v2: Vec3) -> i32 {
             return -1;
         }
     }
-    return 0;
+    0
 }
 
 /// Returns first non-zero component of vector in the order XYZ where x is 0. Returns None if all
@@ -44,5 +44,5 @@ pub(crate) fn first_nonzero_component(v: Vec3) -> Option<u32> {
     if v.z != 0. {
         return Some(2);
     }
-    return None;
+    None
 }

@@ -1,4 +1,4 @@
-use crate::gamemanager::CellColor;
+use crate::cell::CellColor;
 use bevy::prelude::*;
 
 pub(crate) fn select_cell_material(material: &mut StandardMaterial, color: CellColor) {
@@ -11,10 +11,6 @@ pub(crate) fn normal_cell_material(material: &mut StandardMaterial, color: CellC
 
 pub(crate) fn can_go_cell_material(material: &mut StandardMaterial, color: CellColor) {
     material.base_color = blend_colors(cell_base_color(color), Color::LIME_GREEN, 0.3);
-}
-
-pub(crate) fn can_attack_cell_material(material: &mut StandardMaterial, color: CellColor) {
-    material.base_color = blend_colors(cell_base_color(color), Color::YELLOW_GREEN, 0.3);
 }
 
 fn cell_base_color(color: CellColor) -> Color {
