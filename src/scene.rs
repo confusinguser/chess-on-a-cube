@@ -5,7 +5,7 @@ use std::f32::consts::PI;
 
 use bevy::prelude::Vec3;
 
-use crate::gamemanager::{self, Cell, CellCoordinates, Game, GamePhase};
+use crate::gamemanager::{self, Cell, CellColor, CellCoordinates, Game};
 use crate::materials;
 
 pub(crate) fn construct_cube(
@@ -27,6 +27,7 @@ pub(crate) fn construct_cube(
         for i in 0..side_length.pow(2) {
             let translation;
             let mut rotation;
+            let color: CellColor;
             #[allow(clippy::needless_late_init)]
             let coords;
             match side {
@@ -37,6 +38,11 @@ pub(crate) fn construct_cube(
                         (i / side_length % side_length) as f32 * spacing - offset,
                     );
                     rotation = Vec3::new(0., 0., 2.); // Up/down rotate 180 degrees, which is 2 turns
+                    color = if i % 2 == 0 {
+                        CellColor::White
+                    } else {
+                        CellColor::Black
+                    };
                     coords = CellCoordinates::new(
                         i % side_length + 1,
                         0,
@@ -51,6 +57,11 @@ pub(crate) fn construct_cube(
                         if side % 2 == 1 { 0.5 } else { -0.5 },
                     );
                     rotation = Vec3::new(1., 0., 0.);
+                    color = if i % 2 == 0 {
+                        CellColor::Gray
+                    } else {
+                        CellColor::White
+                    };
                     coords = CellCoordinates::new(
                         i % side_length + 1,
                         i / side_length % side_length + 1,
@@ -65,6 +76,11 @@ pub(crate) fn construct_cube(
                         (i % side_length) as f32 * spacing - offset,
                     );
                     rotation = Vec3::new(0., 0., 1.);
+                    color = if i % 2 == 0 {
+                        CellColor::Black
+                    } else {
+                        CellColor::Gray
+                    };
                     coords = CellCoordinates::new(
                         0,
                         i / side_length % side_length + 1,
@@ -99,9 +115,8 @@ pub(crate) fn construct_cube(
                 ))
                 .id();
 
-            let cell = Cell::new(plane, coords);
+            let cell = Cell::new(plane, coords, color);
             game.board.new_cell(coords, cell);
-            //lookup_planes.planes[side][i as usize] = Some(plane);
         }
     }
 }
@@ -122,21 +137,11 @@ pub(crate) fn update_cell_colors(
         let query_result = query.get(plane).unwrap();
         let material = materials.get_mut(query_result.0).unwrap();
         if game.selected_cell.map_or(false, |x| x == cell.coords) {
-            materials::select_cell_material(material);
-        } else if cell.selected_unit_can_attack
-            && game
-                .units
-                .get_unit(cell.coords)
-                .map_or(false, |unit| match game.phase {
-                    GamePhase::Play(turn) => unit.team != turn,
-                    _ => false,
-                })
-        {
-            materials::can_attack_cell_material(material);
-        } else if cell.selected_unit_distance.is_some() {
-            materials::can_go_cell_material(material);
+            materials::select_cell_material(material, cell.color);
+        } else if cell.selected_unit_can_move_to {
+            materials::can_go_cell_material(material, cell.color);
         } else {
-            materials::normal_cell_material(material);
+            materials::normal_cell_material(material, cell.color);
         }
     }
 }

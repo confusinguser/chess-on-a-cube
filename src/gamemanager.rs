@@ -24,16 +24,25 @@ impl Game {
             phase: GamePhase::PlaceUnits,
             stored_units: vec![
                 Unit::new(UnitType::Melee, Team::Black, CellCoordinates::default()),
-                Unit::new(UnitType::Laser, Team::Red, CellCoordinates::default()),
+                Unit::new(UnitType::Laser, Team::White, CellCoordinates::default()),
             ],
         }
+    }
+
+    fn next_player_turn(&mut self) {
+        if let GamePhase::Play(turn) = self.phase {
+            self.phase = GamePhase::Play(match turn {
+                Team::Black => Team::White,
+                Team::White => Team::Black,
+            })
+        };
     }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(crate) enum Team {
     Black,
-    Red,
+    White,
 }
 
 #[derive(Debug, Default)]
@@ -135,21 +144,28 @@ impl Board {
 pub(crate) struct Cell {
     pub(crate) cell_type: CellType,
     pub(crate) plane: Entity,
-    pub(crate) selected_unit_distance: Option<u32>,
-    pub(crate) selected_unit_can_attack: bool,
+    pub(crate) selected_unit_can_move_to: bool,
     pub(crate) coords: CellCoordinates,
+    pub(crate) color: CellColor,
 }
 
 impl Cell {
-    pub(crate) fn new(plane: Entity, coords: CellCoordinates) -> Self {
+    pub(crate) fn new(plane: Entity, coords: CellCoordinates, cell_color: CellColor) -> Self {
         Self {
             plane,
             coords,
-            selected_unit_distance: None,
-            selected_unit_can_attack: false,
+            selected_unit_can_move_to: false,
             cell_type: default(),
+            color: cell_color,
         }
     }
+}
+
+#[derive(Clone, Debug, Copy)]
+pub(crate) enum CellColor {
+    White,
+    Black,
+    Gray,
 }
 
 #[derive(Default, Clone, Debug)]
@@ -285,7 +301,7 @@ impl CellCoordinates {
         dist: u32,
         only_walkable: bool,
         board: &Board,
-    ) -> Vec<(CellCoordinates, u32)> {
+    ) -> Vec<CellCoordinates> {
         let mut output = Vec::new();
         let mut queue = VecDeque::new();
         queue.push_back((self, 0));
@@ -294,13 +310,13 @@ impl CellCoordinates {
             if entry.1 > dist {
                 break;
             }
-            output.push(entry);
+            output.push(entry.0);
 
             for adjacent in entry.0.get_adjacent(board.cube_side_length) {
                 if only_walkable && !board.get_cell(self).unwrap().cell_type.walkable() {
                     continue;
                 }
-                if !output.iter().any(|cell| cell.0 == entry.0) {
+                if !output.iter().any(|cell| *cell == entry.0) {
                     continue;
                 }
                 queue.push_back((adjacent, entry.1 + 1));
@@ -375,101 +391,76 @@ fn on_cell_clicked_play_phase(
     turn: Team,
 ) {
     let cell_clicked = query.get(target);
-    let coords;
+    let clicked_coords;
     if let Ok(cell_clicked) = cell_clicked {
         if cell_clicked.0.is_none() {
             // Didn't click a part of the cube
             return;
         }
-        coords = cell_clicked.0.unwrap().coords;
+        clicked_coords = cell_clicked.0.unwrap().coords;
     } else {
         return;
     }
 
     let old_selected_cell = game.selected_cell;
-    game.selected_cell = Some(coords);
+    game.selected_cell = Some(clicked_coords);
 
-    let cell = game.board.get_cell_mut(coords).unwrap();
+    let clicked_cell = game.board.get_cell_mut(clicked_coords).unwrap();
 
-    fn attack_unit(
+    fn capture_unit(
         commands: &mut Commands,
-        attacked_unit_coords: CellCoordinates,
-        attacking_unit_coords: CellCoordinates,
+        captured_unit_coords: CellCoordinates,
         units: &mut Units,
         turn: Team,
     ) {
-        let mut unit_pair = units.get_units_mut(vec![attacking_unit_coords, attacked_unit_coords]);
-        let attacking_unit = unit_pair.remove(0);
-        let attacked_unit = unit_pair.remove(1);
-        if let (Some(attacking_unit), Some(attacked_unit)) = (attacking_unit, attacked_unit) {
-            if attacked_unit.team == turn {
+        let captured_unit = units.get_unit_mut(captured_unit_coords);
+        if let Some(captured_unit) = captured_unit {
+            if captured_unit.team == turn {
                 return;
             }
-            attacked_unit.take_damage(attacking_unit.unit_type.damage());
-            if attacked_unit.hp <= 0 {
-                kill_unit_entity(commands, attacked_unit);
-                units.remove_dead_units();
-            }
+            kill_unit_entity(commands, captured_unit);
+            captured_unit.dead = true;
+            units.remove_dead_units();
         }
     }
 
-    if cell.selected_unit_can_attack && game.units.is_unit_at(coords) {
-        if let Some(attacking_unit_cell) = old_selected_cell {
-            attack_unit(
+    if clicked_cell.selected_unit_can_move_to {
+        if game.units.is_unit_at(clicked_coords) {
+            capture_unit(
                 &mut commands,
-                coords, // attacked_unit_cell
-                attacking_unit_cell,
+                clicked_coords, // captured_unit_coords
                 &mut game.units,
                 turn,
             );
         }
-    }
 
-    // Move selected unit
-    if let Some(unit) = game.units.get_unit(coords) {
-        dbg!(&unit);
-        let cell = game.board.get_cell(coords).unwrap();
-        if let (Some(selected_unit_distance), Some(unit_location)) =
-            (cell.selected_unit_distance, old_selected_cell)
-        {
-            dbg!(selected_unit_distance, unit_location);
-            move_unit_entity(coords, &mut game.board, query, unit);
-            let unit = game.units.get_unit_mut(unit_location);
-            if let Some(mut unit) = unit {
-                unit.coords = coords; // Set coords of unit on old selected cell to clicked cell
-                unit.range = unit.range.saturating_sub(selected_unit_distance);
+        // Move selected unit
+        if let Some(capturing_unit_coords) = old_selected_cell {
+            if let Some(capturing_unit) = game.units.get_unit_mut(capturing_unit_coords) {
+                capturing_unit.move_unit_to(clicked_coords);
+                move_unit_entity(clicked_coords, &mut game.board, query, capturing_unit);
+                game.next_player_turn();
             }
         }
     }
 
     // Mark cells
     reset_cells_new_selection(game);
-    if let Some(occupant) = game.units.get_unit(coords) {
+    if let Some(occupant) = game.units.get_unit(clicked_coords) {
         if occupant.team != turn {
             return;
         }
         // Mark which cells the selected unit can go to
         let cells_can_go = occupant.cells_can_move_to(&game.board);
         for cell_coords in cells_can_go {
-            let cell = game.board.get_cell_mut(cell_coords.0);
-            match cell {
-                None => {
-                    warn!("Cell {:?} doesn't exist", cell_coords.0);
-                }
-                Some(cell) => {
-                    cell.selected_unit_distance = Some(cell_coords.1);
-                }
-            }
-        }
-
-        let cells_can_attack = occupant.cells_can_attack(&game.board);
-        for cell_coords in cells_can_attack {
             let cell = game.board.get_cell_mut(cell_coords);
             match cell {
                 None => {
                     warn!("Cell {:?} doesn't exist", cell_coords);
                 }
-                Some(cell) => cell.selected_unit_can_attack = true,
+                Some(cell) => {
+                    cell.selected_unit_can_move_to = true;
+                }
             }
         }
     }
@@ -477,8 +468,7 @@ fn on_cell_clicked_play_phase(
 
 fn reset_cells_new_selection(game: &mut Game) {
     for cell in game.board.get_all_cells_mut() {
-        cell.selected_unit_distance = None;
-        cell.selected_unit_can_attack = false;
+        cell.selected_unit_can_move_to = false;
     }
 }
 
