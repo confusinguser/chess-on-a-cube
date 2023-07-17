@@ -13,6 +13,7 @@ pub(crate) struct Game {
     pub(crate) selected_cell: Option<CellCoordinates>,
     pub(crate) phase: GamePhase,
     pub(crate) stored_units: Vec<Unit>,
+    pub(crate) turn: Team,
 }
 impl Game {
     pub(crate) fn new(cube_side_length: u32) -> Self {
@@ -25,16 +26,15 @@ impl Game {
                 Unit::new(UnitType::Melee, Team::Black, CellCoordinates::default()),
                 Unit::new(UnitType::Laser, Team::White, CellCoordinates::default()),
             ],
+            turn: Team::White,
         }
     }
 
     fn next_player_turn(&mut self) {
-        if let GamePhase::Play(turn) = self.phase {
-            self.phase = GamePhase::Play(match turn {
-                Team::Black => Team::White,
-                Team::White => Team::Black,
-            })
-        };
+        self.turn = match self.turn {
+            Team::Black => Team::White,
+            Team::White => Team::Black,
+        }
     }
 }
 
@@ -47,7 +47,7 @@ pub(crate) enum Team {
 #[derive(PartialEq, Debug)]
 pub(crate) enum GamePhase {
     PlaceUnits,
-    Play(Team),
+    Play,
 }
 
 pub(crate) fn on_cell_clicked(
@@ -59,9 +59,7 @@ pub(crate) fn on_cell_clicked(
 ) -> Bubble {
     let game = &mut *game;
     match game.phase {
-        GamePhase::Play(turn) => {
-            on_cell_clicked_play_phase(click.target, &mut query, game, commands, turn)
-        }
+        GamePhase::Play => on_cell_clicked_play_phase(click.target, &mut query, game, commands),
         GamePhase::PlaceUnits => on_cell_clicked_place_units_phase(
             click.target,
             &mut query,
@@ -103,7 +101,7 @@ fn on_cell_clicked_place_units_phase(
         }
     }
     if game.stored_units.is_empty() {
-        game.phase = GamePhase::Play(Team::Black);
+        game.phase = GamePhase::Play;
     }
 }
 
@@ -112,7 +110,6 @@ fn on_cell_clicked_play_phase(
     query: &mut Query<(Option<&MainCube>, &mut Transform)>,
     mut game: &mut Game,
     mut commands: Commands,
-    turn: Team,
 ) {
     let cell_clicked = query.get(target);
     let clicked_coords;
@@ -136,34 +133,38 @@ fn on_cell_clicked_play_phase(
         captured_unit_coords: CellCoordinates,
         units: &mut Units,
         turn: Team,
-    ) {
+    ) -> bool {
         let captured_unit = units.get_unit_mut(captured_unit_coords);
         if let Some(captured_unit) = captured_unit {
             if captured_unit.team == turn {
-                return;
+                return false;
             }
             kill_unit_entity(commands, captured_unit);
             captured_unit.dead = true;
             units.remove_dead_units();
         }
+        true
     }
 
     if clicked_cell.selected_unit_can_move_to {
+        let mut should_move = true;
         if game.units.is_unit_at(clicked_coords) {
-            capture_unit(
+            should_move = capture_unit(
                 &mut commands,
                 clicked_coords, // captured_unit_coords
                 &mut game.units,
-                turn,
+                game.turn,
             );
         }
 
         // Move selected unit
-        if let Some(capturing_unit_coords) = old_selected_cell {
-            if let Some(capturing_unit) = game.units.get_unit_mut(capturing_unit_coords) {
-                capturing_unit.move_unit_to(clicked_coords);
-                move_unit_entity(clicked_coords, &mut game.board, query, capturing_unit);
-                game.next_player_turn();
+        if should_move {
+            if let Some(capturing_unit_coords) = old_selected_cell {
+                if let Some(capturing_unit) = game.units.get_unit_mut(capturing_unit_coords) {
+                    capturing_unit.move_unit_to(clicked_coords);
+                    move_unit_entity(clicked_coords, &mut game.board, query, capturing_unit);
+                    game.next_player_turn();
+                }
             }
         }
     }
@@ -171,7 +172,7 @@ fn on_cell_clicked_play_phase(
     // Mark cells
     reset_cells_new_selection(game);
     if let Some(occupant) = game.units.get_unit(clicked_coords) {
-        if occupant.team != turn {
+        if occupant.team != game.turn {
             return;
         }
         // Mark which cells the selected unit can go to
@@ -242,10 +243,10 @@ pub(crate) fn on_unit_clicked(
     commands: Commands,
 ) -> Bubble {
     let game = &mut *game;
-    if let GamePhase::Play(turn) = game.phase {
+    if game.phase == GamePhase::Play {
         if let Some(unit) = game.units.get_unit_from_entity(click.target) {
             if let Some(cell) = game.board.get_cell(unit.coords) {
-                on_cell_clicked_play_phase(cell.plane, &mut query, game, commands, turn);
+                on_cell_clicked_play_phase(cell.plane, &mut query, game, commands);
             } else {
                 warn!("Cell is None");
             }

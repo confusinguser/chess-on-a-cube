@@ -2,6 +2,8 @@ use std::collections::{BTreeMap, VecDeque};
 
 use bevy::prelude::*;
 
+use crate::utils;
+
 #[derive(Clone, Debug)]
 pub(crate) struct Cell {
     pub(crate) cell_type: CellType,
@@ -65,82 +67,103 @@ impl CellCoordinates {
     }
 
     pub(crate) fn get_adjacent(&self, cube_side_length: u32) -> [CellCoordinates; 4] {
-        let directions = [
-            Vec3::X,
-            Vec3::NEG_X,
-            Vec3::Y,
-            Vec3::NEG_Y,
-            Vec3::Z,
-            Vec3::NEG_Z,
-        ];
-
         let mut output: [CellCoordinates; 4] = Default::default();
-        let normal = self.normal_direction();
         let mut i = 0;
-        for direction in directions {
-            if normal == direction || normal == direction * -1. {
-                continue; // We ignore directions which would go out of and into the cube
+        for direction in utils::CartesianDirection::directions() {
+            let adjacent = self.get_cell_in_direction(direction, cube_side_length);
+
+            if adjacent.is_none() {
+                continue;
             }
+
             if i >= 4 {
                 warn!("More than 4 directions in get_adjacent => No zero-field in CellCoordinate");
                 break;
             }
 
-            let mut adjacent = *self;
-            let mut relevant_coordinate;
-            if direction.x != 0. {
-                relevant_coordinate = adjacent.x as i32 + direction.x as i32;
-            } else if direction.y != 0. {
-                relevant_coordinate = adjacent.y as i32 + direction.y as i32;
-            } else if direction.z != 0. {
-                relevant_coordinate = adjacent.z as i32 + direction.z as i32;
-            } else {
-                unreachable!();
-            };
-            let mut folded_to_other_face = false;
-            // We start counting coordinates at 1 since 0 represents on the plane
-            if relevant_coordinate <= 0 {
-                adjacent.normal_is_positive = false;
-                relevant_coordinate = 0;
-                folded_to_other_face = true;
-            } else if relevant_coordinate > cube_side_length as i32 {
-                adjacent.normal_is_positive = true;
-                relevant_coordinate = 0;
-                folded_to_other_face = true;
-            }
-
-            if folded_to_other_face {
-                let set_old_normal_to = if self.normal_is_positive {
-                    cube_side_length
-                } else {
-                    1
-                };
-
-                // Set the correct coordinate along the old normal vector
-                if normal.x != 0. {
-                    adjacent.x = set_old_normal_to;
-                };
-                if normal.y != 0. {
-                    adjacent.y = set_old_normal_to;
-                };
-                if normal.z != 0. {
-                    adjacent.z = set_old_normal_to;
-                };
-            }
-
-            if direction.x != 0. {
-                adjacent.x = relevant_coordinate as u32;
-            } else if direction.y != 0. {
-                adjacent.y = relevant_coordinate as u32;
-            } else if direction.z != 0. {
-                adjacent.z = relevant_coordinate as u32;
-            }
-
-            output[i] = adjacent;
+            output[i] = adjacent.unwrap();
             i += 1;
         }
         output
     }
+
+    fn get_cell_in_direction(
+        &self,
+        direction: utils::CartesianDirection,
+        cube_side_length: u32,
+    ) -> Option<CellCoordinates> {
+        let normal = self.normal_direction();
+        let direction = direction.as_vec3();
+        if normal == direction || normal == direction * -1. {
+            return None; // We ignore directions which would go out of and into the cube
+        }
+
+        let mut adjacent = *self;
+        let mut relevant_coordinate;
+        if direction.x != 0. {
+            relevant_coordinate = adjacent.x as i32 + direction.x as i32;
+        } else if direction.y != 0. {
+            relevant_coordinate = adjacent.y as i32 + direction.y as i32;
+        } else if direction.z != 0. {
+            relevant_coordinate = adjacent.z as i32 + direction.z as i32;
+        } else {
+            unreachable!();
+        };
+        let mut folded_to_other_face = false;
+        // We start counting coordinates at 1 since 0 represents on the plane
+        if relevant_coordinate <= 0 {
+            adjacent.normal_is_positive = false;
+            relevant_coordinate = 0;
+            folded_to_other_face = true;
+        } else if relevant_coordinate > cube_side_length as i32 {
+            adjacent.normal_is_positive = true;
+            relevant_coordinate = 0;
+            folded_to_other_face = true;
+        }
+
+        if folded_to_other_face {
+            let old_normal_axis_new_val = if self.normal_is_positive {
+                cube_side_length
+            } else {
+                1
+            };
+
+            // Set the correct coordinate along the old normal vector
+            if normal.x != 0. {
+                adjacent.x = old_normal_axis_new_val;
+            };
+            if normal.y != 0. {
+                adjacent.y = old_normal_axis_new_val;
+            };
+            if normal.z != 0. {
+                adjacent.z = old_normal_axis_new_val;
+            };
+        }
+
+        if direction.x != 0. {
+            adjacent.x = relevant_coordinate as u32;
+        } else if direction.y != 0. {
+            adjacent.y = relevant_coordinate as u32;
+        } else if direction.z != 0. {
+            adjacent.z = relevant_coordinate as u32;
+        }
+
+        Some(adjacent)
+    }
+
+    fn get_cell_in_radial_direction(
+        &self,
+        direction: utils::RadialDirection,
+    ) -> Option<CellCoordinates> {
+        let direction_vec = direction.as_vec3();
+        if utils::vectors_shared_component_sign(self.normal_direction(), direction_vec) != 0 {
+            // The direction is not possible to go in on this side
+            return None;
+        }
+        todo!();
+    }
+
+    fn get_diagonal_adjacent(&self) {}
 
     pub(crate) fn normal_direction(&self) -> Vec3 {
         let sign = if self.normal_is_positive { 1. } else { -1. };

@@ -42,7 +42,7 @@ pub(crate) fn construct_cube(
                     color = if i % 2 == 0 {
                         CellColor::White
                     } else {
-                        CellColor::Black
+                        CellColor::Gray
                     };
                     coords = CellCoordinates::new(
                         i % side_length + 1,
@@ -59,7 +59,7 @@ pub(crate) fn construct_cube(
                     );
                     rotation = Vec3::new(1., 0., 0.);
                     color = if i % 2 == 0 {
-                        CellColor::Gray
+                        CellColor::Black
                     } else {
                         CellColor::White
                     };
@@ -78,9 +78,9 @@ pub(crate) fn construct_cube(
                     );
                     rotation = Vec3::new(0., 0., 1.);
                     color = if i % 2 == 0 {
-                        CellColor::Black
-                    } else {
                         CellColor::Gray
+                    } else {
+                        CellColor::Black
                     };
                     coords = CellCoordinates::new(
                         0,

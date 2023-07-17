@@ -46,3 +46,65 @@ pub(crate) fn first_nonzero_component(v: Vec3) -> Option<u32> {
     }
     None
 }
+
+pub(crate) enum RadialDirection {
+    ClockwiseX,
+    CounterX,
+    ClockwiseY,
+    CounterY,
+    ClockwiseZ,
+    CounterZ,
+}
+
+impl RadialDirection {
+    pub(crate) fn as_vec3(&self) -> Vec3 {
+        match self {
+            RadialDirection::ClockwiseX => Vec3::new(1., 0., 0.),
+            RadialDirection::CounterX => Vec3::new(-1., 0., 0.),
+            RadialDirection::ClockwiseY => Vec3::new(0., 1., 0.),
+            RadialDirection::CounterY => Vec3::new(0., -1., 0.),
+            RadialDirection::ClockwiseZ => Vec3::new(0., 0., 1.),
+            RadialDirection::CounterZ => Vec3::new(0., 0., -1.),
+        }
+    }
+}
+
+pub(crate) enum CartesianDirection {
+    X,
+    NegX,
+    Y,
+    NegY,
+    Z,
+    NegZ,
+}
+
+impl CartesianDirection {
+    pub(crate) fn as_vec3(&self) -> Vec3 {
+        match self {
+            CartesianDirection::X => Vec3::new(1., 0., 0.),
+            CartesianDirection::NegX => Vec3::new(-1., 0., 0.),
+            CartesianDirection::Y => Vec3::new(0., 1., 0.),
+            CartesianDirection::NegY => Vec3::new(0., -1., 0.),
+            CartesianDirection::Z => Vec3::new(0., 0., 1.),
+            CartesianDirection::NegZ => Vec3::new(0., 0., -1.),
+        }
+    }
+
+    pub(crate) fn directions() -> [CartesianDirection; 6] {
+        [
+            CartesianDirection::X,
+            CartesianDirection::NegX,
+            CartesianDirection::Y,
+            CartesianDirection::NegY,
+            CartesianDirection::Z,
+            CartesianDirection::NegZ,
+        ]
+    }
+}
+
+pub(crate) fn radial_direction_to_cartesian_direction(
+    radial_direction: RadialDirection,
+    normal: CartesianDirection,
+) -> CartesianDirection {
+    todo!();
+}
