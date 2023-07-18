@@ -1,8 +1,9 @@
 use std::collections::{BTreeMap, VecDeque};
+use std::ops::{Index, IndexMut};
 
 use bevy::prelude::*;
 
-use crate::utils;
+use crate::utils::{self, CartesianDirection, RadialDirection};
 
 #[derive(Clone, Debug)]
 pub(crate) struct Cell {
@@ -93,10 +94,11 @@ impl CellCoordinates {
         cube_side_length: u32,
     ) -> Option<CellCoordinates> {
         let normal = self.normal_direction();
-        let direction = direction.as_vec3();
-        if normal == direction || normal == direction * -1. {
+        if normal.abs() == direction.abs() {
             return None; // We ignore directions which would go out of and into the cube
         }
+
+        let direction = direction.as_vec3();
 
         let mut adjacent = *self;
         let mut relevant_coordinate;
@@ -129,15 +131,7 @@ impl CellCoordinates {
             };
 
             // Set the correct coordinate along the old normal vector
-            if normal.x != 0. {
-                adjacent.x = old_normal_axis_new_val;
-            };
-            if normal.y != 0. {
-                adjacent.y = old_normal_axis_new_val;
-            };
-            if normal.z != 0. {
-                adjacent.z = old_normal_axis_new_val;
-            };
+            adjacent[normal.axis_num() as usize] = old_normal_axis_new_val
         }
 
         if direction.x != 0. {
@@ -153,29 +147,96 @@ impl CellCoordinates {
 
     fn get_cell_in_radial_direction(
         &self,
-        direction: utils::RadialDirection,
+        radial_direction: utils::RadialDirection,
+        cube_side_length: u32,
     ) -> Option<CellCoordinates> {
-        let direction_vec = direction.as_vec3();
-        if utils::vectors_shared_component_sign(self.normal_direction(), direction_vec) != 0 {
+        dbg!(radial_direction, self.normal_direction());
+        if radial_direction.rotation_axis().abs() == self.normal_direction().abs() {
             // The direction is not possible to go in on this side
             return None;
         }
+
+        let cartesian_direction = utils::radial_direction_to_cartesian_direction(
+            radial_direction,
+            self.normal_direction(),
+        );
+
+        dbg!(cartesian_direction);
+        self.get_cell_in_direction(cartesian_direction.unwrap(), cube_side_length)
+    }
+
+    pub(crate) fn get_diagonal_adjacent(&self) {}
+
+    pub(crate) fn get_diagonal_max_dist(
+        &self,
+        dist: u32,
+        max_edge_crossings: u32,
+    ) -> Vec<CellCoordinates> {
         todo!();
     }
 
-    fn get_diagonal_adjacent(&self) {}
+    pub(crate) fn get_straight_max_dist(
+        &self,
+        max_dist: u32,
+        max_edge_crossings: u32,
+        cube_side_length: u32,
+    ) -> Vec<CellCoordinates> {
+        let mut output = Vec::new();
+        for direction in RadialDirection::directions() {
+            let mut latest_cell = *self;
+            let mut dist = 0;
+            let mut edge_crossings = 0;
+            loop {
+                let next_cell =
+                    latest_cell.get_cell_in_radial_direction(direction, cube_side_length);
+                if next_cell.is_none() {
+                    break;
+                }
+                let next_cell = next_cell.unwrap();
 
-    pub(crate) fn normal_direction(&self) -> Vec3 {
+                if output.iter().any(|cell| *cell == next_cell) {
+                    break;
+                }
+
+                dist += 1;
+                if next_cell.normal_direction() != latest_cell.normal_direction() {
+                    edge_crossings += 1;
+                }
+
+                if dist > max_dist || edge_crossings > max_edge_crossings {
+                    break;
+                }
+
+                output.push(next_cell);
+                latest_cell = next_cell;
+            }
+        }
+        output
+    }
+
+    pub(crate) fn normal_direction(&self) -> CartesianDirection {
         let sign = if self.normal_is_positive { 1. } else { -1. };
 
         if self.z == 0 {
-            Vec3::new(0., 0., sign)
+            if self.normal_is_positive {
+                CartesianDirection::Z
+            } else {
+                CartesianDirection::NegZ
+            }
         } else if self.y == 0 {
-            Vec3::new(0., sign, 0.)
+            if self.normal_is_positive {
+                CartesianDirection::Y
+            } else {
+                CartesianDirection::NegY
+            }
         } else if self.x == 0 {
-            Vec3::new(sign, 0., 0.)
+            if self.normal_is_positive {
+                CartesianDirection::X
+            } else {
+                CartesianDirection::NegX
+            }
         } else {
-            Vec3::ZERO
+            panic!("No zero field on CellCoordinates: {:?}", self);
         }
     }
 
@@ -208,6 +269,30 @@ impl CellCoordinates {
             }
         }
         output
+    }
+}
+
+impl Index<usize> for CellCoordinates {
+    type Output = u32;
+
+    fn index(&self, index: usize) -> &Self::Output {
+        match index {
+            0 => &self.x,
+            1 => &self.y,
+            2 => &self.z,
+            _ => panic!("index out of bounds"),
+        }
+    }
+}
+
+impl IndexMut<usize> for CellCoordinates {
+    fn index_mut(&mut self, index: usize) -> &mut Self::Output {
+        match index {
+            0 => &mut self.x,
+            1 => &mut self.y,
+            2 => &mut self.z,
+            _ => panic!("index out of bounds"),
+        }
     }
 }
 

@@ -64,15 +64,15 @@ fn setup(
             point_light: PointLight {
                 intensity: 9000.0,
                 range: 100.,
-                shadows_enabled: true,
+                shadows_enabled: false,
                 ..default()
             },
-            transform: Transform::from_xyz(12., 16., 8.),
+            transform: Transform::from_xyz(8., 8., 8.),
             ..default()
         },
-        //MainCamera {
-        //    start_coords: Vec3::new(12., 16., 8.),
-        //},
+        MainCamera {
+            start_coords: Vec3::new(8., 8., 8.),
+        },
     ));
 
     commands.spawn((

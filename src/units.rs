@@ -31,8 +31,8 @@ impl Unit {
     /// range of the unit)
     pub(crate) fn cells_can_move_to(&self, board: &Board) -> Vec<CellCoordinates> {
         match self.unit_type {
-            UnitType::Melee => melee_unit_movement(self, board),
-            UnitType::Laser => laser_unit_movement(self, board),
+            UnitType::Melee => rook_movement(self, board),
+            UnitType::Laser => rook_movement(self, board),
         }
     }
 
@@ -47,6 +47,15 @@ impl Unit {
 
 fn melee_unit_movement(unit: &Unit, board: &Board) -> Vec<CellCoordinates> {
     unit.coords.get_cells_max_dist(unit.range, true, board)
+}
+
+fn bishop_movement(unit: &Unit, board: &Board) -> Vec<CellCoordinates> {
+    unit.coords.get_diagonal_max_dist(u32::MAX, 1)
+}
+
+fn rook_movement(unit: &Unit, board: &Board) -> Vec<CellCoordinates> {
+    unit.coords
+        .get_straight_max_dist(u32::MAX, 1, board.cube_side_length)
 }
 
 fn laser_unit_movement(unit: &Unit, board: &Board) -> Vec<CellCoordinates> {

@@ -1,4 +1,4 @@
-use bevy::prelude::Vec3;
+use bevy::prelude::*;
 
 #[derive(Default, Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) struct Vec3i {
@@ -47,6 +47,7 @@ pub(crate) fn first_nonzero_component(v: Vec3) -> Option<u32> {
     None
 }
 
+#[derive(Debug, Clone, Copy)]
 pub(crate) enum RadialDirection {
     ClockwiseX,
     CounterX,
@@ -59,16 +60,54 @@ pub(crate) enum RadialDirection {
 impl RadialDirection {
     pub(crate) fn as_vec3(&self) -> Vec3 {
         match self {
-            RadialDirection::ClockwiseX => Vec3::new(1., 0., 0.),
-            RadialDirection::CounterX => Vec3::new(-1., 0., 0.),
-            RadialDirection::ClockwiseY => Vec3::new(0., 1., 0.),
-            RadialDirection::CounterY => Vec3::new(0., -1., 0.),
-            RadialDirection::ClockwiseZ => Vec3::new(0., 0., 1.),
-            RadialDirection::CounterZ => Vec3::new(0., 0., -1.),
+            Self::ClockwiseX => Vec3::new(1., 0., 0.),
+            Self::CounterX => Vec3::new(-1., 0., 0.),
+            Self::ClockwiseY => Vec3::new(0., 1., 0.),
+            Self::CounterY => Vec3::new(0., -1., 0.),
+            Self::ClockwiseZ => Vec3::new(0., 0., 1.),
+            Self::CounterZ => Vec3::new(0., 0., -1.),
         }
+    }
+
+    /// When on a side that has normal vector on the same axis as one of the elements, start
+    /// walking toward negative coordinates to continue walking in the same radial direction
+    fn negate_movement_on(&self) -> [CartesianDirection; 2] {
+        match self {
+            Self::ClockwiseX | Self::CounterX => [CartesianDirection::NegY, CartesianDirection::X],
+            Self::ClockwiseY | Self::CounterY => [CartesianDirection::X, CartesianDirection::Z],
+            Self::ClockwiseZ | Self::CounterZ => [CartesianDirection::NegX, CartesianDirection::Z],
+        }
+    }
+    fn is_counterclockwise(&self) -> bool {
+        match self {
+            Self::ClockwiseX | Self::ClockwiseY | Self::ClockwiseZ => false,
+            Self::CounterX | Self::CounterY | Self::CounterZ => true,
+        }
+    }
+
+    pub(crate) fn rotation_axis(&self) -> CartesianDirection {
+        match self {
+            Self::ClockwiseX => CartesianDirection::X,
+            Self::CounterX => CartesianDirection::NegX,
+            Self::ClockwiseY => CartesianDirection::Y,
+            Self::CounterY => CartesianDirection::NegY,
+            Self::ClockwiseZ => CartesianDirection::Z,
+            Self::CounterZ => CartesianDirection::NegZ,
+        }
+    }
+    pub(crate) fn directions() -> [RadialDirection; 6] {
+        [
+            Self::ClockwiseX,
+            Self::CounterX,
+            Self::ClockwiseY,
+            Self::CounterY,
+            Self::ClockwiseZ,
+            Self::CounterZ,
+        ]
     }
 }
 
+#[derive(PartialEq, Debug, Clone, Copy)]
 pub(crate) enum CartesianDirection {
     X,
     NegX,
@@ -81,30 +120,80 @@ pub(crate) enum CartesianDirection {
 impl CartesianDirection {
     pub(crate) fn as_vec3(&self) -> Vec3 {
         match self {
-            CartesianDirection::X => Vec3::new(1., 0., 0.),
-            CartesianDirection::NegX => Vec3::new(-1., 0., 0.),
-            CartesianDirection::Y => Vec3::new(0., 1., 0.),
-            CartesianDirection::NegY => Vec3::new(0., -1., 0.),
-            CartesianDirection::Z => Vec3::new(0., 0., 1.),
-            CartesianDirection::NegZ => Vec3::new(0., 0., -1.),
+            Self::X => Vec3::new(1., 0., 0.),
+            Self::NegX => Vec3::new(-1., 0., 0.),
+            Self::Y => Vec3::new(0., 1., 0.),
+            Self::NegY => Vec3::new(0., -1., 0.),
+            Self::Z => Vec3::new(0., 0., 1.),
+            Self::NegZ => Vec3::new(0., 0., -1.),
+        }
+    }
+
+    fn is_negative(&self) -> bool {
+        match self {
+            Self::X | Self::Y | Self::Z => false,
+            Self::NegX | Self::NegY | Self::NegZ => true,
+        }
+    }
+
+    pub(crate) fn abs(&self) -> CartesianDirection {
+        match self {
+            Self::X | Self::NegX => Self::X,
+            Self::Y | Self::NegY => Self::Y,
+            Self::Z | Self::NegZ => Self::Z,
         }
     }
 
     pub(crate) fn directions() -> [CartesianDirection; 6] {
         [
-            CartesianDirection::X,
-            CartesianDirection::NegX,
-            CartesianDirection::Y,
-            CartesianDirection::NegY,
-            CartesianDirection::Z,
-            CartesianDirection::NegZ,
+            Self::X,
+            Self::NegX,
+            Self::Y,
+            Self::NegY,
+            Self::Z,
+            Self::NegZ,
         ]
+    }
+
+    pub(crate) fn axis_num(&self) -> u32 {
+        match self {
+            Self::X | Self::NegX => 0,
+            Self::Y | Self::NegY => 1,
+            Self::Z | Self::NegZ => 2,
+        }
     }
 }
 
 pub(crate) fn radial_direction_to_cartesian_direction(
     radial_direction: RadialDirection,
     normal: CartesianDirection,
-) -> CartesianDirection {
-    todo!();
+) -> Option<CartesianDirection> {
+    if normal.abs() == radial_direction.rotation_axis().abs() {
+        warn!("utils::radial_direction_to_cartesian_direction called with radial_direction on same axis as normal");
+        return None;
+    }
+
+    let mut negate = false;
+    let negate_movement_on_axes = radial_direction.negate_movement_on();
+    for axis in negate_movement_on_axes {
+        if normal == axis {
+            negate = true;
+            break;
+        }
+    }
+
+    if radial_direction.is_counterclockwise() {
+        negate = !negate
+    }
+
+    return Some(
+        *CartesianDirection::directions()
+            .iter()
+            .find(|dir| {
+                dir.abs() != normal.abs()
+                    && dir.abs() != radial_direction.rotation_axis().abs()
+                    && dir.is_negative() ^ !negate
+            })
+            .unwrap(),
+    );
 }

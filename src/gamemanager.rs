@@ -208,7 +208,7 @@ pub(crate) fn spawn_unit_entity(
     let plane = game.board.get_cell(coords).unwrap().plane;
     let mut translation = query.get(plane).unwrap().1.translation;
     let scale = 1. / game.board.cube_side_length as f32 / 3.;
-    translation += coords.normal_direction() * scale;
+    translation += coords.normal_direction().as_vec3() * scale;
     let transform = Transform::from_translation(translation).with_scale(Vec3::splat(scale));
     let model_name = unit.unit_type.model_name();
     let entity = scene::spawn_unit(commands, transform, asset_server, model_name);
@@ -228,7 +228,7 @@ pub(crate) fn move_unit_entity(
     let plane = board.get_cell(coords).unwrap().plane;
     let mut target_translation = query.get(plane).unwrap().1.translation;
     let scale = 1. / board.cube_side_length as f32 / 3.;
-    target_translation += coords.normal_direction() * scale;
+    target_translation += coords.normal_direction().as_vec3() * scale;
 
     query.get_mut(unit.entity.unwrap()).unwrap().1.translation = target_translation;
 }
