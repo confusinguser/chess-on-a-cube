@@ -82,17 +82,19 @@ impl CellCoordinates {
                 break;
             }
 
-            output[i] = adjacent.unwrap();
+            output[i] = adjacent.unwrap().0;
             i += 1;
         }
         output
     }
 
+    /// Returns a tuple where the second element denotes if the new cell is on a different side
+    /// than the first
     fn get_cell_in_direction(
         &self,
         direction: utils::CartesianDirection,
         cube_side_length: u32,
-    ) -> Option<CellCoordinates> {
+    ) -> Option<(CellCoordinates, bool)> {
         let normal = self.normal_direction();
         if normal.abs() == direction.abs() {
             return None; // We ignore directions which would go out of and into the cube
@@ -142,14 +144,14 @@ impl CellCoordinates {
             adjacent.z = relevant_coordinate as u32;
         }
 
-        Some(adjacent)
+        Some((adjacent, folded_to_other_face))
     }
 
     fn get_cell_in_radial_direction(
         &self,
         radial_direction: utils::RadialDirection,
         cube_side_length: u32,
-    ) -> Option<CellCoordinates> {
+    ) -> Option<(CellCoordinates, bool)> {
         dbg!(radial_direction, self.normal_direction());
         if radial_direction.rotation_axis().abs() == self.normal_direction().abs() {
             // The direction is not possible to go in on this side
@@ -161,13 +163,32 @@ impl CellCoordinates {
             self.normal_direction(),
         );
 
-        dbg!(cartesian_direction);
         self.get_cell_in_direction(cartesian_direction.unwrap(), cube_side_length)
     }
 
-    pub(crate) fn get_diagonal_adjacent(&self) {}
+    /// Gets the diagonal that can be reached by walking in the cartesian directions consecutively,
+    /// does not return true neigbors. The second element of the second element denotes if the new
+    /// cell is on a different side than the first
+    pub(crate) fn get_diagonal(
+        &self,
+        c1: CartesianDirection,
+        c2: CartesianDirection,
+        cube_side_length: u32,
+    ) -> Option<(CellCoordinates, bool)> {
+        let Some(cell1) = self.get_cell_in_direction(c1, cube_side_length) else {return None};
+        let Some(cell2) = cell1.0.get_cell_in_direction(c2, cube_side_length) else {return None};
+        if cell1.1 && cell2.1 {
+            // The second element tells us if the transformation went over a cube edge, in this
+            // case we are in a corner, which means we have a true neighbor in cell2
+            return None;
+        }
 
-    pub(crate) fn get_diagonal_max_dist(
+        Some(cell2)
+    }
+
+    pub(crate) fn get_diagonals(&self) {}
+
+    pub(crate) fn get_diagonals_max_dist(
         &self,
         dist: u32,
         max_edge_crossings: u32,
@@ -194,12 +215,12 @@ impl CellCoordinates {
                 }
                 let next_cell = next_cell.unwrap();
 
-                if output.iter().any(|cell| *cell == next_cell) {
+                if output.iter().any(|cell| *cell == next_cell.0) {
                     break;
                 }
 
                 dist += 1;
-                if next_cell.normal_direction() != latest_cell.normal_direction() {
+                if next_cell.1 {
                     edge_crossings += 1;
                 }
 
@@ -207,16 +228,14 @@ impl CellCoordinates {
                     break;
                 }
 
-                output.push(next_cell);
-                latest_cell = next_cell;
+                output.push(next_cell.0);
+                latest_cell = next_cell.0;
             }
         }
         output
     }
 
     pub(crate) fn normal_direction(&self) -> CartesianDirection {
-        let sign = if self.normal_is_positive { 1. } else { -1. };
-
         if self.z == 0 {
             if self.normal_is_positive {
                 CartesianDirection::Z

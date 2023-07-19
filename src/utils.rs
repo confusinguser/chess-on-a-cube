@@ -144,6 +144,14 @@ impl CartesianDirection {
         }
     }
 
+    pub(crate) fn axis_num(&self) -> u32 {
+        match self {
+            Self::X | Self::NegX => 0,
+            Self::Y | Self::NegY => 1,
+            Self::Z | Self::NegZ => 2,
+        }
+    }
+
     pub(crate) fn directions() -> [CartesianDirection; 6] {
         [
             Self::X,
@@ -155,12 +163,24 @@ impl CartesianDirection {
         ]
     }
 
-    pub(crate) fn axis_num(&self) -> u32 {
-        match self {
-            Self::X | Self::NegX => 0,
-            Self::Y | Self::NegY => 1,
-            Self::Z | Self::NegZ => 2,
+    pub(crate) fn diagonals() -> [(Self, Self); 12] {
+        let mut out = [(Self::X, Self::X); 12];
+        let mut i = 0;
+        for dir in Self::directions() {
+            for dir2 in Self::directions() {
+                if dir.abs() == dir2.abs()
+                    || out
+                        .iter()
+                        .any(|&diagonal| diagonal == (dir, dir2) || diagonal == (dir2, dir))
+                {
+                    continue;
+                } else {
+                    out[i] = (dir, dir2);
+                    i += 1;
+                }
+            }
         }
+        out
     }
 }
 
