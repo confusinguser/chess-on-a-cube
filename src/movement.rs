@@ -247,7 +247,8 @@ mod parts {
             let left_right_axis = radial_direction
                 .to_cartesian_direction(coords.normal_direction())
                 .unwrap()
-                .get_perpendicular_axis(coords.normal_direction());
+                .get_perpendicular_axis(coords.normal_direction())
+                .unwrap();
 
             if edge_crossings > max_edge_crossings {
                 continue;
@@ -256,7 +257,7 @@ mod parts {
             for direction_2 in [left_right_axis, left_right_axis.negate()] {
                 let endpoint = forward_two
                     .0
-                    .get_cell_in_direction(left_right_axis, cube_side_length)
+                    .get_cell_in_direction(direction_2, cube_side_length)
                     .unwrap();
                 if endpoint.1 && edge_crossings + 1 > max_edge_crossings {
                     // Will go over the max if add this one

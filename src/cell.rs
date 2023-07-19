@@ -1,9 +1,8 @@
-use std::collections::{BTreeMap, VecDeque};
+use std::collections::BTreeMap;
 use std::ops::{Index, IndexMut};
 
 use bevy::prelude::*;
 
-use crate::units::Units;
 use crate::utils::{self, CartesianDirection, RadialDirection};
 
 #[derive(Clone, Debug)]
@@ -158,10 +157,7 @@ impl CellCoordinates {
             return None;
         }
 
-        let cartesian_direction = utils::radial_direction_to_cartesian_direction(
-            radial_direction,
-            self.normal_direction(),
-        );
+        let cartesian_direction = radial_direction.to_cartesian_direction(self.normal_direction());
 
         self.get_cell_in_direction(cartesian_direction.unwrap(), cube_side_length)
     }
@@ -183,10 +179,6 @@ impl CellCoordinates {
         }
 
         Some((cell2.0, cell1.1 || cell2.1))
-    }
-
-    pub(crate) fn get_diagonals(&self) -> Vec<CellCoordinates> {
-        todo!()
     }
 
     pub(crate) fn normal_direction(&self) -> CartesianDirection {

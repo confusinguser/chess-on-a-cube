@@ -97,11 +97,9 @@ impl RadialDirection {
     }
 
     pub(crate) fn to_cartesian_direction(
-        &self,
+        self,
         normal: CartesianDirection,
     ) -> Option<CartesianDirection> {
-        dbg!(self);
-        dbg!(normal);
         if normal.abs() == self.rotation_axis().abs() {
             warn!("utils::radial_direction_to_cartesian_direction called with radial_direction on same axis as normal");
             return None;
@@ -129,7 +127,6 @@ impl RadialDirection {
             })
             .copied();
 
-        dbg!(&out);
         out
     }
 
@@ -156,6 +153,20 @@ pub(crate) enum CartesianDirection {
 }
 
 impl CartesianDirection {
+    pub(crate) fn from_axis_num(axis_num: u32, is_positive: bool) -> Self {
+        let mut output = match axis_num {
+            0 => Self::X,
+            1 => Self::Y,
+            2 => Self::Z,
+            _ => unreachable!(),
+        };
+
+        if !is_positive {
+            output = output.negate();
+        }
+        output
+    }
+
     pub(crate) fn as_vec3(&self) -> Vec3 {
         match self {
             Self::X => Vec3::new(1., 0., 0.),
@@ -190,6 +201,7 @@ impl CartesianDirection {
         }
     }
 
+    #[must_use]
     pub(crate) fn negate(&self) -> CartesianDirection {
         match self {
             Self::X => Self::NegX,
@@ -201,8 +213,19 @@ impl CartesianDirection {
         }
     }
 
-    /// Returns the positive direction whose axis that is perpendicular to the two others
-    pub(crate) fn get_perpendicular_axis(&self, other: CartesianDirection) -> CartesianDirection {}
+    /// Returns the positive direction whose axis that is perpendicular to the two others. Returns
+    /// None if the two directions are on the same axis
+    pub(crate) fn get_perpendicular_axis(
+        &self,
+        other: CartesianDirection,
+    ) -> Option<CartesianDirection> {
+        for axis_num in 0..3 {
+            if self.axis_num() != axis_num && other.axis_num() != axis_num {
+                return Some(CartesianDirection::from_axis_num(axis_num, true));
+            }
+        }
+        None
+    }
 
     pub(crate) fn directions() -> [CartesianDirection; 6] {
         [

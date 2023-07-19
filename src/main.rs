@@ -12,7 +12,6 @@ use bevy::prelude::*;
 use bevy_mod_picking::prelude::*;
 
 fn main() {
-    dbg!("e");
     App::new()
         .add_plugins(
             DefaultPlugins

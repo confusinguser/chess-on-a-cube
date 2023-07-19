@@ -1,4 +1,4 @@
-use crate::cell::{Board, CellCoordinates};
+use crate::cell::CellCoordinates;
 use crate::gamemanager::Team;
 use bevy::prelude::*;
 
