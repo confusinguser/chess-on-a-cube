@@ -195,3 +195,17 @@ pub(crate) fn add_pickable_to_unit(
 pub(crate) fn kill_unit(commands: &mut Commands, entity: Entity) {
     commands.entity(entity).despawn();
 }
+
+pub(crate) fn move_unit_entities(
+    mut query: Query<(Option<&MainCube>, &mut Transform)>,
+    game: ResMut<Game>,
+) {
+    for unit_to_move in &game.units_to_move {
+        let plane = game.board.get_cell(unit_to_move.1).unwrap().plane;
+        let mut target_translation = query.get(plane).unwrap().1.translation;
+        let scale = 1. / game.board.cube_side_length as f32 / 3.;
+        target_translation += unit_to_move.1.normal_direction().as_vec3() * scale;
+
+        query.get_mut(unit_to_move.0).unwrap().1.translation = target_translation;
+    }
+}

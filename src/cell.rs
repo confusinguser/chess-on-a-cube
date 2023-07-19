@@ -3,6 +3,7 @@ use std::ops::{Index, IndexMut};
 
 use bevy::prelude::*;
 
+use crate::units::Units;
 use crate::utils::{self, CartesianDirection, RadialDirection};
 
 #[derive(Clone, Debug)]
@@ -41,7 +42,7 @@ pub(crate) enum CellType {
 }
 
 impl CellType {
-    fn walkable(&self) -> bool {
+    pub(crate) fn walkable(&self) -> bool {
         match self {
             Self::Empty => true,
             Self::Mountain => false,
@@ -90,7 +91,7 @@ impl CellCoordinates {
 
     /// Returns a tuple where the second element denotes if the new cell is on a different side
     /// than the first
-    fn get_cell_in_direction(
+    pub(crate) fn get_cell_in_direction(
         &self,
         direction: utils::CartesianDirection,
         cube_side_length: u32,
@@ -147,12 +148,11 @@ impl CellCoordinates {
         Some((adjacent, folded_to_other_face))
     }
 
-    fn get_cell_in_radial_direction(
+    pub(crate) fn get_cell_in_radial_direction(
         &self,
-        radial_direction: utils::RadialDirection,
+        radial_direction: RadialDirection,
         cube_side_length: u32,
     ) -> Option<(CellCoordinates, bool)> {
-        dbg!(radial_direction, self.normal_direction());
         if radial_direction.rotation_axis().abs() == self.normal_direction().abs() {
             // The direction is not possible to go in on this side
             return None;
@@ -171,68 +171,22 @@ impl CellCoordinates {
     /// cell is on a different side than the first
     pub(crate) fn get_diagonal(
         &self,
-        c1: CartesianDirection,
-        c2: CartesianDirection,
+        diagonal: (CartesianDirection, CartesianDirection),
         cube_side_length: u32,
     ) -> Option<(CellCoordinates, bool)> {
-        let Some(cell1) = self.get_cell_in_direction(c1, cube_side_length) else {return None};
-        let Some(cell2) = cell1.0.get_cell_in_direction(c2, cube_side_length) else {return None};
+        let Some(cell1) = self.get_cell_in_direction(diagonal.0, cube_side_length) else {return None};
+        let Some(cell2) = cell1.0.get_cell_in_direction(diagonal.1, cube_side_length) else {return None};
         if cell1.1 && cell2.1 {
             // The second element tells us if the transformation went over a cube edge, in this
             // case we are in a corner, which means we have a true neighbor in cell2
             return None;
         }
 
-        Some(cell2)
+        Some((cell2.0, cell1.1 || cell2.1))
     }
 
-    pub(crate) fn get_diagonals(&self) {}
-
-    pub(crate) fn get_diagonals_max_dist(
-        &self,
-        dist: u32,
-        max_edge_crossings: u32,
-    ) -> Vec<CellCoordinates> {
-        todo!();
-    }
-
-    pub(crate) fn get_straight_max_dist(
-        &self,
-        max_dist: u32,
-        max_edge_crossings: u32,
-        cube_side_length: u32,
-    ) -> Vec<CellCoordinates> {
-        let mut output = Vec::new();
-        for direction in RadialDirection::directions() {
-            let mut latest_cell = *self;
-            let mut dist = 0;
-            let mut edge_crossings = 0;
-            loop {
-                let next_cell =
-                    latest_cell.get_cell_in_radial_direction(direction, cube_side_length);
-                if next_cell.is_none() {
-                    break;
-                }
-                let next_cell = next_cell.unwrap();
-
-                if output.iter().any(|cell| *cell == next_cell.0) {
-                    break;
-                }
-
-                dist += 1;
-                if next_cell.1 {
-                    edge_crossings += 1;
-                }
-
-                if dist > max_dist || edge_crossings > max_edge_crossings {
-                    break;
-                }
-
-                output.push(next_cell.0);
-                latest_cell = next_cell.0;
-            }
-        }
-        output
+    pub(crate) fn get_diagonals(&self) -> Vec<CellCoordinates> {
+        todo!()
     }
 
     pub(crate) fn normal_direction(&self) -> CartesianDirection {
@@ -257,37 +211,6 @@ impl CellCoordinates {
         } else {
             panic!("No zero field on CellCoordinates: {:?}", self);
         }
-    }
-
-    /// Returns a list of tuples where the first element is the coordinate and the second is the
-    /// distance to the cell
-    pub(crate) fn get_cells_max_dist(
-        self,
-        dist: u32,
-        only_walkable: bool,
-        board: &Board,
-    ) -> Vec<CellCoordinates> {
-        let mut output = Vec::new();
-        let mut queue = VecDeque::new();
-        queue.push_back((self, 0));
-        while !queue.is_empty() {
-            let entry = queue.pop_front().unwrap();
-            if entry.1 > dist {
-                break;
-            }
-            output.push(entry.0);
-
-            for adjacent in entry.0.get_adjacent(board.cube_side_length) {
-                if only_walkable && !board.get_cell(self).unwrap().cell_type.walkable() {
-                    continue;
-                }
-                if !output.iter().any(|cell| *cell == entry.0) {
-                    continue;
-                }
-                queue.push_back((adjacent, entry.1 + 1));
-            }
-        }
-        output
     }
 }
 

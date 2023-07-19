@@ -73,9 +73,9 @@ impl RadialDirection {
     /// walking toward negative coordinates to continue walking in the same radial direction
     fn negate_movement_on(&self) -> [CartesianDirection; 2] {
         match self {
-            Self::ClockwiseX | Self::CounterX => [CartesianDirection::NegY, CartesianDirection::X],
-            Self::ClockwiseY | Self::CounterY => [CartesianDirection::X, CartesianDirection::Z],
-            Self::ClockwiseZ | Self::CounterZ => [CartesianDirection::NegX, CartesianDirection::Z],
+            Self::ClockwiseX | Self::CounterX => [CartesianDirection::Y, CartesianDirection::NegZ],
+            Self::ClockwiseY | Self::CounterY => [CartesianDirection::NegX, CartesianDirection::Z],
+            Self::ClockwiseZ | Self::CounterZ => [CartesianDirection::X, CartesianDirection::NegY],
         }
     }
     fn is_counterclockwise(&self) -> bool {
@@ -95,6 +95,44 @@ impl RadialDirection {
             Self::CounterZ => CartesianDirection::NegZ,
         }
     }
+
+    pub(crate) fn to_cartesian_direction(
+        &self,
+        normal: CartesianDirection,
+    ) -> Option<CartesianDirection> {
+        dbg!(self);
+        dbg!(normal);
+        if normal.abs() == self.rotation_axis().abs() {
+            warn!("utils::radial_direction_to_cartesian_direction called with radial_direction on same axis as normal");
+            return None;
+        }
+
+        let mut negate = false;
+        let negate_movement_on_axes = self.negate_movement_on();
+        for axis in negate_movement_on_axes {
+            if normal == axis {
+                negate = true;
+                break;
+            }
+        }
+
+        if self.is_counterclockwise() {
+            negate = !negate
+        }
+
+        let out = CartesianDirection::directions()
+            .iter()
+            .find(|dir| {
+                dir.abs() != normal.abs()
+                    && dir.abs() != self.rotation_axis().abs()
+                    && dir.is_negative() ^ !negate
+            })
+            .copied();
+
+        dbg!(&out);
+        out
+    }
+
     pub(crate) fn directions() -> [RadialDirection; 6] {
         [
             Self::ClockwiseX,
@@ -152,6 +190,20 @@ impl CartesianDirection {
         }
     }
 
+    pub(crate) fn negate(&self) -> CartesianDirection {
+        match self {
+            Self::X => Self::NegX,
+            Self::NegX => Self::X,
+            Self::Y => Self::NegY,
+            Self::NegY => Self::Y,
+            Self::Z => Self::NegZ,
+            Self::NegZ => Self::Z,
+        }
+    }
+
+    /// Returns the positive direction whose axis that is perpendicular to the two others
+    pub(crate) fn get_perpendicular_axis(&self, other: CartesianDirection) -> CartesianDirection {}
+
     pub(crate) fn directions() -> [CartesianDirection; 6] {
         [
             Self::X,
@@ -182,38 +234,4 @@ impl CartesianDirection {
         }
         out
     }
-}
-
-pub(crate) fn radial_direction_to_cartesian_direction(
-    radial_direction: RadialDirection,
-    normal: CartesianDirection,
-) -> Option<CartesianDirection> {
-    if normal.abs() == radial_direction.rotation_axis().abs() {
-        warn!("utils::radial_direction_to_cartesian_direction called with radial_direction on same axis as normal");
-        return None;
-    }
-
-    let mut negate = false;
-    let negate_movement_on_axes = radial_direction.negate_movement_on();
-    for axis in negate_movement_on_axes {
-        if normal == axis {
-            negate = true;
-            break;
-        }
-    }
-
-    if radial_direction.is_counterclockwise() {
-        negate = !negate
-    }
-
-    return Some(
-        *CartesianDirection::directions()
-            .iter()
-            .find(|dir| {
-                dir.abs() != normal.abs()
-                    && dir.abs() != radial_direction.rotation_axis().abs()
-                    && dir.is_negative() ^ !negate
-            })
-            .unwrap(),
-    );
 }

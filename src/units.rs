@@ -10,8 +10,6 @@ pub(crate) struct Unit {
     pub(crate) entity: Option<Entity>,
     pub(crate) team: Team,
     pub(crate) dead: bool,
-    /// How many more cells this unit can move in on this turn
-    pub(crate) range: u32,
 }
 
 impl Unit {
@@ -22,17 +20,6 @@ impl Unit {
             entity: None,
             team,
             dead: false,
-            range: unit_type.range(),
-        }
-    }
-
-    /// Returns a list of tuples where the first element is the coordinate of the cell the unit
-    /// can move to, and the second element is how far away the cell is (how much it depletes the
-    /// range of the unit)
-    pub(crate) fn cells_can_move_to(&self, board: &Board) -> Vec<CellCoordinates> {
-        match self.unit_type {
-            UnitType::Melee => rook_movement(self, board),
-            UnitType::Laser => rook_movement(self, board),
         }
     }
 
@@ -45,41 +32,25 @@ impl Unit {
     }
 }
 
-fn melee_unit_movement(unit: &Unit, board: &Board) -> Vec<CellCoordinates> {
-    unit.coords.get_cells_max_dist(unit.range, true, board)
-}
-
-fn bishop_movement(unit: &Unit, board: &Board) -> Vec<CellCoordinates> {
-    unit.coords.get_diagonal_max_dist(u32::MAX, 1)
-}
-
-fn rook_movement(unit: &Unit, board: &Board) -> Vec<CellCoordinates> {
-    unit.coords
-        .get_straight_max_dist(u32::MAX, 1, board.cube_side_length)
-}
-
-fn laser_unit_movement(unit: &Unit, board: &Board) -> Vec<CellCoordinates> {
-    unit.coords.get_cells_max_dist(unit.range, true, board)
-}
-
 #[derive(Copy, Clone, Debug)]
 pub(crate) enum UnitType {
-    Melee,
-    Laser,
+    Rook,
+    Bishop,
+    King,
+    Pawn,
+    Knight,
+    Queen,
 }
 
 impl UnitType {
-    pub(crate) fn range(&self) -> u32 {
-        match self {
-            Self::Melee => 2,
-            Self::Laser => 1,
-        }
-    }
-
     pub(crate) fn model_name(&self) -> &str {
         match self {
-            UnitType::Melee => "melee",
-            UnitType::Laser => "laser",
+            UnitType::Rook => "rook",
+            UnitType::Bishop => "bishop",
+            UnitType::King => "king",
+            UnitType::Pawn => "pawn",
+            UnitType::Knight => "knight",
+            UnitType::Queen => "queen",
         }
     }
 }

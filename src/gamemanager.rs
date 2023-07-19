@@ -1,4 +1,5 @@
-use crate::units::*;
+use crate::movement::GameMove;
+use crate::{movement, units::*};
 
 use crate::cell::*;
 use crate::scene::{self, MainCube};
@@ -14,6 +15,7 @@ pub(crate) struct Game {
     pub(crate) phase: GamePhase,
     pub(crate) stored_units: Vec<Unit>,
     pub(crate) turn: Team,
+    pub(crate) units_to_move: Vec<(Entity, CellCoordinates)>,
 }
 impl Game {
     pub(crate) fn new(cube_side_length: u32) -> Self {
@@ -23,10 +25,11 @@ impl Game {
             selected_cell: None,
             phase: GamePhase::PlaceUnits,
             stored_units: vec![
-                Unit::new(UnitType::Melee, Team::Black, CellCoordinates::default()),
-                Unit::new(UnitType::Laser, Team::White, CellCoordinates::default()),
+                Unit::new(UnitType::Rook, Team::Black, CellCoordinates::default()),
+                Unit::new(UnitType::Bishop, Team::White, CellCoordinates::default()),
             ],
             turn: Team::White,
+            units_to_move: Vec::new(),
         }
     }
 
@@ -159,10 +162,12 @@ fn on_cell_clicked_play_phase(
 
         // Move selected unit
         if should_move {
-            if let Some(capturing_unit_coords) = old_selected_cell {
-                if let Some(capturing_unit) = game.units.get_unit_mut(capturing_unit_coords) {
-                    capturing_unit.move_unit_to(clicked_coords);
-                    move_unit_entity(clicked_coords, &mut game.board, query, capturing_unit);
+            if let Some(from) = old_selected_cell {
+                let game_move = GameMove {
+                    from,
+                    to: clicked_coords,
+                };
+                if movement::make_move(game_move, game) {
                     game.next_player_turn();
                 }
             }
@@ -176,8 +181,8 @@ fn on_cell_clicked_play_phase(
             return;
         }
         // Mark which cells the selected unit can go to
-        let cells_can_go = occupant.cells_can_move_to(&game.board);
-        for cell_coords in cells_can_go {
+        let unit_moves = movement::get_unit_moves(occupant, &game.board, &game.units);
+        for cell_coords in unit_moves {
             let cell = game.board.get_cell_mut(cell_coords);
             match cell {
                 None => {
@@ -215,22 +220,9 @@ pub(crate) fn spawn_unit_entity(
     unit.set_entity(entity);
 }
 
-pub(crate) fn move_unit_entity(
-    coords: CellCoordinates,
-    board: &mut Board,
-    query: &mut Query<(Option<&MainCube>, &mut Transform)>,
-    unit: &Unit,
-) {
-    if unit.entity.is_none() {
-        return;
-    }
-
-    let plane = board.get_cell(coords).unwrap().plane;
-    let mut target_translation = query.get(plane).unwrap().1.translation;
-    let scale = 1. / board.cube_side_length as f32 / 3.;
-    target_translation += coords.normal_direction().as_vec3() * scale;
-
-    query.get_mut(unit.entity.unwrap()).unwrap().1.translation = target_translation;
+pub(crate) fn move_unit_entity(game_move: GameMove, game: &mut Game) {
+    let Some(Some(entity)) = game.units.get_unit(game_move.from).map(|unit| unit.entity) else {return;};
+    game.units_to_move.push((entity, game_move.to));
 }
 
 //TODO fix

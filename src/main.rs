@@ -2,6 +2,7 @@ mod cell;
 mod cube_rotation;
 mod gamemanager;
 mod materials;
+mod movement;
 mod scene;
 mod units;
 mod utils;
@@ -31,6 +32,7 @@ fn main() {
         .add_system(cube_rotation::rotate)
         .add_system(scene::update_cell_colors)
         .add_system(scene::add_pickable_to_unit.run_if(any_with_component::<scene::AddPickable>()))
+        .add_system(scene::move_unit_entities)
         .run();
 }
 
