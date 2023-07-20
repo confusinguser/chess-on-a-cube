@@ -103,7 +103,7 @@ fn on_cell_clicked_place_units_phase(
 fn on_cell_clicked_play_phase(
     target: Entity,
     query: &mut Query<(Option<&MainCube>, &mut Transform)>,
-    mut game: &mut Game,
+    game: &mut Game,
     mut commands: Commands,
 ) {
     let cell_clicked = query.get(target);

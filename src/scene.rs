@@ -17,7 +17,16 @@ pub(crate) fn construct_cube(
     material: &StandardMaterial,
     game: &mut ResMut<Game>,
 ) {
-    fn choose_color(side_length: u32, i: u32, c1: CellColor, c2: CellColor) -> CellColor {
+    fn choose_color(
+        side_length: u32,
+        i: u32,
+        mut c1: CellColor,
+        mut c2: CellColor,
+        switch_colors: bool,
+    ) -> CellColor {
+        if switch_colors {
+            std::mem::swap(&mut c1, &mut c2);
+        }
         #[allow(clippy::collapsible_else_if)]
         if side_length % 2 == 0 {
             if (i / side_length + i % 2) % 2 == 0 {
@@ -56,7 +65,13 @@ pub(crate) fn construct_cube(
                         (i / side_length % side_length) as f32 * spacing - offset,
                     );
                     rotation = Vec3::new(0., 0., 2.); // Up/down rotate 180 degrees, which is 2 turns
-                    color = choose_color(side_length, i, CellColor::White, CellColor::Gray);
+                    color = choose_color(
+                        side_length,
+                        i,
+                        CellColor::White,
+                        CellColor::Gray,
+                        side % 2 == 0,
+                    );
                     coords = CellCoordinates::new(
                         i % side_length + 1,
                         0,
@@ -71,7 +86,13 @@ pub(crate) fn construct_cube(
                         if side % 2 == 1 { 0.5 } else { -0.5 },
                     );
                     rotation = Vec3::new(1., 0., 0.);
-                    color = choose_color(side_length, i, CellColor::Black, CellColor::White);
+                    color = choose_color(
+                        side_length,
+                        i,
+                        CellColor::Black,
+                        CellColor::White,
+                        side % 2 == 1,
+                    );
                     coords = CellCoordinates::new(
                         i % side_length + 1,
                         i / side_length % side_length + 1,
@@ -86,7 +107,13 @@ pub(crate) fn construct_cube(
                         (i % side_length) as f32 * spacing - offset,
                     );
                     rotation = Vec3::new(0., 0., 1.);
-                    color = choose_color(side_length, i, CellColor::Gray, CellColor::Black);
+                    color = choose_color(
+                        side_length,
+                        i,
+                        CellColor::Gray,
+                        CellColor::Black,
+                        side % 2 == 0,
+                    );
                     coords = CellCoordinates::new(
                         0,
                         i / side_length % side_length + 1,

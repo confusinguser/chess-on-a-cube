@@ -18,7 +18,7 @@ pub(crate) fn rotate(
     mut rotation_data: Local<RotationData>,
 ) {
     let time = &*time;
-    let mut rotation_data = &mut *rotation_data;
+    let rotation_data = &mut *rotation_data;
     let rotation_duration = 1.0;
     macro_rules! input_handling {
         ($keycode:expr, $axis:expr) => {
