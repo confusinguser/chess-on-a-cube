@@ -78,6 +78,14 @@ fn pawn_movement(
     direction: RadialDirection,
     has_moved: bool,
 ) -> Vec<CellCoordinates> {
+    if direction
+        .to_cartesian_direction(unit_coords.normal_direction())
+        .is_none()
+    {
+        error!("Pawn has a direction that can't be walked in");
+        return Vec::new();
+    }
+
     let mut output = parts::get_cells_in_direction(
         unit_coords,
         if has_moved { 1 } else { 2 },
@@ -87,10 +95,6 @@ fn pawn_movement(
         direction,
         false,
     );
-
-    if output.is_empty() {
-        error!("Pawn has a direction that can't be walked in");
-    };
 
     let forward = direction
         .to_cartesian_direction(unit_coords.normal_direction())

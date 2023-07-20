@@ -277,6 +277,7 @@ pub(crate) fn move_unit_entities(
     mut query: Query<(Option<&MainCube>, &mut Transform)>,
     mut game: ResMut<Game>,
 ) {
+    let mut success = Vec::with_capacity(game.entities_to_move.len());
     for unit_to_move in &game.entities_to_move {
         let plane = game.board.get_cell(unit_to_move.1).unwrap().plane;
         let target_translation = query.get(plane).unwrap().1.translation;
@@ -284,10 +285,20 @@ pub(crate) fn move_unit_entities(
         let rotation =
             Quat::from_rotation_arc(Vec3::Y, unit_to_move.1.normal_direction().as_vec3());
 
-        let mut transform_entity = query.get_mut(unit_to_move.0).unwrap().1;
+        let Ok(transform_entity) = query.get_mut(unit_to_move.0) else {
+            success.push(false);
+            return;
+        };
+        let mut transform_entity = transform_entity.1;
         transform_entity.translation = target_translation;
-        transform_entity.scale = Vec3::splat(scale);
+        transform_entity.scale = Vec3::new(scale, scale / 2., scale);
         transform_entity.rotation = rotation;
+        success.push(true);
     }
-    game.entities_to_move.clear();
+    let mut index = 0;
+    game.entities_to_move.retain(|_| {
+        let out = !success[index];
+        index += 1;
+        out
+    });
 }

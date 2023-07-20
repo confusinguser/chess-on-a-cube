@@ -151,7 +151,7 @@ fn new_axis_on_side_after_rotation(normal_of_side: Vec3, rot: Quat) -> Vec3 {
 }
 
 /// # Arguments
-/// axis: The middle axis in the EulerRot should correspond to the axis
+/// axis: The first axis in the EulerRot should correspond to the axis animated
 fn animate_axis(
     time: &Time,
     time_started_rotation: &mut Duration,
@@ -176,8 +176,5 @@ fn animate_axis(
         *time_started_rotation = Duration::default();
         *current_rotation *=
             Quat::from_euler(axis, if reversed { -1. } else { 1. } * PI / 2., 0., 0.);
-        dbg!(current_rotation.to_euler(EulerRot::XYZ),);
-        dbg!(current_rotation.to_euler(EulerRot::YXZ),);
-        dbg!(current_rotation.to_euler(EulerRot::ZXY),);
     }
 }

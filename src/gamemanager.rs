@@ -30,10 +30,7 @@ impl Game {
     }
 
     fn next_player_turn(&mut self) {
-        self.turn = match self.turn {
-            Team::Black => Team::White,
-            Team::White => Team::Black,
-        }
+        self.turn = self.turn.opposite()
     }
 }
 
@@ -47,6 +44,13 @@ impl Team {
         match self {
             Self::Black => Color::DARK_GRAY,
             Self::White => Color::BISQUE,
+        }
+    }
+
+    pub(crate) fn opposite(&self) -> Self {
+        match self {
+            Team::Black => Team::White,
+            Team::White => Team::Black,
         }
     }
 }
@@ -164,6 +168,13 @@ fn on_cell_clicked_play_phase(
                     to: clicked_coords,
                 };
                 if movement::make_move(game_move, game) {
+                    if let Some(UnitType::Pawn(_, ref mut first_move)) = game
+                        .units
+                        .get_unit_mut(clicked_coords)
+                        .map(|unit| unit.unit_type)
+                    {
+                        *first_move = false;
+                    }
                     game.next_player_turn();
                 }
             }

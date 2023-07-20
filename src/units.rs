@@ -102,17 +102,44 @@ impl Units {
 
     pub(crate) fn game_starting_configuration(cube_side_length: u32) -> Units {
         let mut output = Units::default();
-        let unit = Unit::new(
-            UnitType::Pawn(RadialDirection::ClockwiseX, false),
-            Team::White,
-            CellCoordinates::new(1, 1, 0, true),
-        );
-        let mut unit2 = unit.clone();
-        output.add_unit(unit);
-        unit2.team = Team::Black;
-        unit2.unit_type = UnitType::King;
-        unit2.coords = unit2.coords.opposite(cube_side_length);
-        output.add_unit(unit2);
+        macro_rules! unit_mirror {
+            ($color:tt $type:tt at ($x:tt, $y:tt, $z:tt, $normal_positive:tt)) => {
+                let unit = Unit::new(
+                    UnitType::$type,
+                    Team::$color,
+                    CellCoordinates::new($x, $y, $z, $normal_positive),
+                );
+                let mut unit2 = unit.clone();
+                unit2.coords = unit2.coords.opposite(cube_side_length);
+                unit2.team = unit.team.opposite();
+                output.add_unit(unit);
+                output.add_unit(unit2);
+            };
+        }
+
+        macro_rules! unit_mirror_pawn {
+            ($color:tt walking in $direction:tt at ($x:tt, $y:tt, $z:tt, $normal_positive:tt)) => {
+                let unit = Unit::new(
+                    UnitType::Pawn(RadialDirection::$direction, false),
+                    Team::$color,
+                    CellCoordinates::new($x, $y, $z, $normal_positive),
+                );
+                let mut unit2 = unit.clone();
+                unit2.coords = unit2.coords.opposite(cube_side_length);
+                unit2.team = unit.team.opposite();
+                output.add_unit(unit);
+                output.add_unit(unit2);
+            };
+        }
+
+        unit_mirror!(White King at (4, 0, 4, true));
+        unit_mirror!(White Knight at (3, 0, 3, true));
+        unit_mirror!(White Queen at (4, 4, 0, true));
+        unit_mirror!(White Rook at (0, 4, 4, true));
+        unit_mirror_pawn!(White walking in ClockwiseY at (3, 4, 0, true));
+        unit_mirror_pawn!(White walking in CounterX at (4, 3, 0, true));
+        unit_mirror_pawn!(White walking in ClockwiseZ at (0, 3, 4, true));
+
         output
     }
 
