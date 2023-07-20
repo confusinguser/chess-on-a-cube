@@ -58,17 +58,6 @@ pub(crate) enum RadialDirection {
 }
 
 impl RadialDirection {
-    pub(crate) fn as_vec3(&self) -> Vec3 {
-        match self {
-            Self::ClockwiseX => Vec3::new(1., 0., 0.),
-            Self::CounterX => Vec3::new(-1., 0., 0.),
-            Self::ClockwiseY => Vec3::new(0., 1., 0.),
-            Self::CounterY => Vec3::new(0., -1., 0.),
-            Self::ClockwiseZ => Vec3::new(0., 0., 1.),
-            Self::CounterZ => Vec3::new(0., 0., -1.),
-        }
-    }
-
     /// When on a side that has normal vector on the same axis as one of the elements, start
     /// walking toward negative coordinates to continue walking in the same radial direction
     fn negate_movement_on(&self) -> [CartesianDirection; 2] {

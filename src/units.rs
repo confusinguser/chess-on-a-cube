@@ -34,6 +34,7 @@ impl Unit {
 }
 
 #[derive(Copy, Clone, Debug, PartialEq)]
+#[allow(unused)]
 pub(crate) enum UnitType {
     Rook,
     Bishop,
@@ -73,28 +74,6 @@ impl Units {
 
     pub(crate) fn get_unit_mut(&mut self, coords: CellCoordinates) -> Option<&mut Unit> {
         self.units.iter_mut().find(|unit| unit.coords == coords)
-    }
-
-    /// TODO: Make unit tests for this one
-    pub(crate) fn get_units_mut(
-        &mut self,
-        coords_list: Vec<CellCoordinates>,
-    ) -> Vec<Option<&mut Unit>> {
-        let mut found_units = self
-            .units
-            .iter_mut()
-            .filter(|unit| coords_list.iter().any(|coords| *coords == unit.coords))
-            .collect::<Vec<&mut Unit>>();
-
-        let mut output = Vec::with_capacity(coords_list.len());
-        output.resize_with(coords_list.len(), || None);
-        for coords in coords_list {
-            let position = found_units.iter().position(|unit| unit.coords == coords);
-            if let Some(position) = position {
-                output[position] = Some(found_units.remove(position));
-            }
-        }
-        output
     }
 
     pub(crate) fn get_unit_from_entity(&self, entity: Entity) -> Option<&Unit> {

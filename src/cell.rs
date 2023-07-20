@@ -7,7 +7,6 @@ use crate::utils::{self, CartesianDirection, RadialDirection};
 
 #[derive(Clone, Debug)]
 pub(crate) struct Cell {
-    pub(crate) cell_type: CellType,
     pub(crate) plane: Entity,
     pub(crate) selected_unit_can_move_to: bool,
     pub(crate) coords: CellCoordinates,
@@ -20,7 +19,6 @@ impl Cell {
             plane,
             coords,
             selected_unit_can_move_to: false,
-            cell_type: default(),
             color: cell_color,
         }
     }
@@ -31,22 +29,6 @@ pub(crate) enum CellColor {
     White,
     Black,
     Gray,
-}
-
-#[derive(Default, Clone, Debug)]
-pub(crate) enum CellType {
-    #[default]
-    Empty,
-    Mountain,
-}
-
-impl CellType {
-    pub(crate) fn walkable(&self) -> bool {
-        match self {
-            Self::Empty => true,
-            Self::Mountain => false,
-        }
-    }
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Default)]

@@ -163,6 +163,7 @@ mod parts {
         output
     }
 
+    #[allow(unused)]
     fn all_cells_on_same_side(coords: CellCoordinates, board: &Board) -> Vec<CellCoordinates> {
         let mut output = Vec::new();
         for cell in board.get_all_cells() {
@@ -172,10 +173,11 @@ mod parts {
         }
         output
     }
+
+    #[allow(unused)]
     pub(crate) fn get_cells_max_dist(
         coords: CellCoordinates,
         max_dist: u32,
-        only_walkable: bool,
         board: &Board,
     ) -> Vec<CellCoordinates> {
         let mut output = Vec::new();
@@ -189,9 +191,6 @@ mod parts {
             output.push(entry.0);
 
             for adjacent in entry.0.get_adjacent(board.cube_side_length) {
-                if only_walkable && !board.get_cell(adjacent).unwrap().cell_type.walkable() {
-                    continue;
-                }
                 if !output.iter().any(|cell| *cell == entry.0) {
                     continue;
                 }

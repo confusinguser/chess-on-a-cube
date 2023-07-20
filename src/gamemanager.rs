@@ -4,7 +4,6 @@ use crate::{movement, units::*};
 use crate::cell::*;
 use crate::scene::{self, MainCube, SceneChild};
 use bevy::prelude::*;
-use bevy::scene::SceneInstance;
 use bevy_mod_picking::prelude::*;
 
 #[derive(Resource, Debug)]
