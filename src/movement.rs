@@ -1,9 +1,9 @@
 use bevy::prelude::{error, warn};
 
 use crate::cell::{Board, CellCoordinates};
-use crate::gamemanager::{self, Game};
+use crate::gamemanager::Game;
 use crate::units::*;
-use crate::utils::RadialDirection;
+use crate::utils::{CartesianDirection, RadialDirection};
 
 pub(crate) struct GameMove {
     pub(crate) from: CellCoordinates,
@@ -78,18 +78,37 @@ fn pawn_movement(
     direction: RadialDirection,
     has_moved: bool,
 ) -> Vec<CellCoordinates> {
-    let mut output = Vec::new();
-    let Some(one_step) = unit_coords.get_cell_in_radial_direction(direction, board.cube_side_length) else {
+    let mut output = parts::get_cells_in_direction(
+        unit_coords,
+        if has_moved { 1 } else { 2 },
+        2,
+        board.cube_side_length,
+        units,
+        direction,
+        false,
+    );
+
+    if output.is_empty() {
         error!("Pawn has a direction that can't be walked in");
-        return output;
     };
-    output.push(one_step.0);
-    if has_moved {
-        let two_steps = one_step
-            .0
-            .get_cell_in_radial_direction(direction, board.cube_side_length)
-            .unwrap();
-        output.push(two_steps.0);
+
+    let forward = direction
+        .to_cartesian_direction(unit_coords.normal_direction())
+        .unwrap();
+
+    for &diagonal in CartesianDirection::diagonals()
+        .iter()
+        .filter(|diag| diag.0 == forward || diag.1 == forward)
+    {
+        let Some(diagonal_coords) = unit_coords.get_diagonal(diagonal, board.cube_side_length) else {
+            continue;
+        };
+
+        // Diagonal capture moves
+        // The filter for only capturing on same side is elsewhere
+        if units.is_unit_at(diagonal_coords.0) {
+            output.push(diagonal_coords.0);
+        }
     }
     output
 }
@@ -97,9 +116,9 @@ fn pawn_movement(
 fn knight_movement(
     unit_coords: CellCoordinates,
     board: &Board,
-    units: &Units,
+    _units: &Units,
 ) -> Vec<CellCoordinates> {
-    parts::get_knight_moves(unit_coords, 1, board.cube_side_length, units)
+    parts::get_knight_moves(unit_coords, 1, board.cube_side_length)
 }
 
 pub(crate) fn make_move(game_move: GameMove, game: &mut Game) -> bool {
@@ -131,43 +150,20 @@ mod parts {
     ) -> Vec<CellCoordinates> {
         let mut output = Vec::new();
         for direction in RadialDirection::directions() {
-            let mut latest_cell = coords;
-            let mut dist = 0;
-            let mut edge_crossings = 0;
-            loop {
-                let next_cell =
-                    latest_cell.get_cell_in_radial_direction(direction, cube_side_length);
-                if next_cell.is_none() {
-                    break;
-                }
-                let next_cell = next_cell.unwrap();
-
-                if output.iter().any(|cell| *cell == next_cell.0) {
-                    break;
-                }
-
-                dist += 1;
-                if next_cell.1 {
-                    edge_crossings += 1;
-                }
-
-                if dist > max_dist || edge_crossings > max_edge_crossings {
-                    break;
-                }
-
-                output.push(next_cell.0);
-
-                if units.is_unit_at(next_cell.0) {
-                    break;
-                }
-
-                latest_cell = next_cell.0;
-            }
+            output.append(&mut get_cells_in_direction(
+                coords,
+                max_dist,
+                max_edge_crossings,
+                cube_side_length,
+                units,
+                direction,
+                true,
+            ))
         }
         output
     }
 
-    fn all_cells_on_side(coords: CellCoordinates, board: &Board) -> Vec<CellCoordinates> {
+    fn all_cells_on_same_side(coords: CellCoordinates, board: &Board) -> Vec<CellCoordinates> {
         let mut output = Vec::new();
         for cell in board.get_all_cells() {
             if cell.coords.normal_direction() == coords.normal_direction() {
@@ -250,7 +246,6 @@ mod parts {
         coords: CellCoordinates,
         max_edge_crossings: u32,
         cube_side_length: u32,
-        units: &Units,
     ) -> Vec<CellCoordinates> {
         let mut output = Vec::new();
         for radial_direction in RadialDirection::directions() {
@@ -295,6 +290,54 @@ mod parts {
             }
         }
 
+        output
+    }
+
+    pub(crate) fn get_cells_in_direction(
+        coords: CellCoordinates,
+        max_dist: u32,
+        max_edge_crossings: u32,
+        cube_side_length: u32,
+        units: &Units,
+        direction: RadialDirection,
+        include_other_unit_cells: bool,
+    ) -> Vec<CellCoordinates> {
+        let mut output = Vec::new();
+        let mut latest_cell = coords;
+        let mut dist = 0;
+        let mut edge_crossings = 0;
+        loop {
+            let next_cell = latest_cell.get_cell_in_radial_direction(direction, cube_side_length);
+            if next_cell.is_none() {
+                break;
+            }
+            let next_cell = next_cell.unwrap();
+
+            if output.iter().any(|cell| *cell == next_cell.0) {
+                break;
+            }
+
+            dist += 1;
+            if next_cell.1 {
+                edge_crossings += 1;
+            }
+
+            if dist > max_dist || edge_crossings > max_edge_crossings {
+                break;
+            }
+
+            if !include_other_unit_cells && units.is_unit_at(next_cell.0) {
+                break;
+            }
+
+            output.push(next_cell.0);
+
+            if units.is_unit_at(next_cell.0) {
+                break;
+            }
+
+            latest_cell = next_cell.0;
+        }
         output
     }
 }

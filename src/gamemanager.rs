@@ -156,7 +156,9 @@ fn on_cell_clicked_play_phase(
             if captured_unit.team == turn {
                 return false;
             }
-            kill_unit_entity(commands, captured_unit);
+            if let Some(entity) = captured_unit.entity {
+                scene::kill_unit(commands, entity);
+            };
             captured_unit.dead = true;
             units.remove_dead_units();
         }
@@ -190,26 +192,28 @@ fn on_cell_clicked_play_phase(
 
     // Mark cells
     reset_cells_new_selection(game);
-    if let Some(unit) = game.units.get_unit(clicked_coords) {
-        if unit.team != game.turn {
-            return;
-        }
-        // Mark which cells the selected unit can go to
-        let unit_moves = movement::get_unit_moves(unit, &game.board, &game.units);
-        for cell_coords in unit_moves {
-            let cell = game.board.get_cell_mut(cell_coords);
-            match cell {
-                None => {
-                    warn!("Cell {:?} doesn't exist", cell_coords);
-                }
-                Some(cell) => {
-                    // Check so normal pieces can't capture over edge
-                    if unit.unit_type.can_capture_over_edge()
-                        || !game.units.is_unit_at(cell_coords)
-                        || unit.coords.normal_direction() == cell_coords.normal_direction()
-                    {
-                        cell.selected_unit_can_move_to = true;
-                    }
+    let Some(unit) = game.units.get_unit(clicked_coords) else { return;};
+    if unit.team != game.turn {
+        return;
+    }
+    // Mark which cells the selected unit can go to
+    let unit_moves = movement::get_unit_moves(unit, &game.board, &game.units);
+    for unit_move in unit_moves {
+        let cell = game.board.get_cell_mut(unit_move);
+        match cell {
+            None => {
+                warn!("Cell {:?} doesn't exist", unit_move);
+            }
+            Some(cell) => {
+                let unit_at_destination = game.units.get_unit(unit_move);
+                // Check so normal pieces can't capture over edge
+                if (unit.unit_type.can_capture_over_edge()
+                    || unit_at_destination.is_none()
+                    || unit.coords.normal_direction() == unit_move.normal_direction())
+                // Prevent taking units on same team
+                    && unit_at_destination.map_or(true, |unit_at_d| unit.team != unit_at_d.team)
+                {
+                    cell.selected_unit_can_move_to = true;
                 }
             }
         }
@@ -265,10 +269,4 @@ pub(crate) fn on_unit_clicked(
         }
     }
     Bubble::Burst
-}
-
-fn kill_unit_entity(commands: &mut Commands, unit: &mut Unit) {
-    if let Some(entity) = unit.entity {
-        scene::kill_unit(commands, entity);
-    }
 }
