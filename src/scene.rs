@@ -173,30 +173,51 @@ pub(crate) fn spawn_unit(
     entity
 }
 
+#[derive(Component)]
+pub(crate) struct SceneChild {
+    pub(crate) parent_entity: Entity,
+}
+
+/// Add pickable and change material color
 pub(crate) fn add_pickable_to_unit(
     mut commands: Commands,
-    unloaded_instances: Query<(Entity, &SceneInstance), With<AddPickable>>,
-    handles: Query<Entity>,
+    mut unloaded_instances: Query<(Entity, &SceneInstance), With<AddPickable>>,
+    mut material_query: Query<&mut Handle<StandardMaterial>>,
+    game: Res<Game>,
     scene_manager: Res<SceneSpawner>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
-    for (entity, instance) in unloaded_instances.iter() {
+    for (parent_entity, instance) in unloaded_instances.iter_mut() {
         if scene_manager.instance_is_ready(**instance) {
-            commands.entity(entity).remove::<AddPickable>();
+            commands.entity(parent_entity).remove::<AddPickable>();
+
+            let unit = game.units.get_unit_from_entity(parent_entity);
+            let color = unit.unwrap().team.color();
+
             // Iterate over all entities in scene (once it's loaded)
-            let handles = handles.iter_many(scene_manager.iter_instance_entities(**instance));
+            let handles = scene_manager.iter_instance_entities(**instance);
             for entity in handles {
                 commands.entity(entity).insert((
                     PickableBundle::default(),
                     RaycastPickTarget::default(),
                     OnPointer::<Click>::run_callback(gamemanager::on_unit_clicked),
+                    SceneChild { parent_entity },
                 ));
+
+                let material = material_query.get_mut(entity);
+                if let Ok(material) = material {
+                    let material = materials.get_mut(material.into_inner());
+                    if let Some(material) = material {
+                        material.base_color = color;
+                    }
+                }
             }
         }
     }
 }
 
 pub(crate) fn kill_unit(commands: &mut Commands, entity: Entity) {
-    commands.entity(entity).despawn();
+    commands.entity(entity).despawn_recursive();
 }
 
 pub(crate) fn move_unit_entities(

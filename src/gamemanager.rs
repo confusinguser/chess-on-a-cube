@@ -2,7 +2,7 @@ use crate::movement::GameMove;
 use crate::{movement, units::*};
 
 use crate::cell::*;
-use crate::scene::{self, MainCube};
+use crate::scene::{self, MainCube, SceneChild};
 use bevy::prelude::*;
 use bevy::scene::SceneInstance;
 use bevy_mod_picking::prelude::*;
@@ -45,6 +45,14 @@ impl Game {
 pub(crate) enum Team {
     Black,
     White,
+}
+impl Team {
+    pub(crate) fn color(&self) -> Color {
+        match self {
+            Self::Black => Color::DARK_GRAY,
+            Self::White => Color::BISQUE,
+        }
+    }
 }
 
 #[derive(PartialEq, Debug)]
@@ -233,18 +241,20 @@ pub(crate) fn spawn_unit_entity(
     unit.set_entity(entity);
 }
 
-//TODO fix
 pub(crate) fn on_unit_clicked(
     In(click): In<ListenedEvent<Click>>,
-    scene_query: Query<(Entity, &SceneInstance)>,
     mut query: Query<(Option<&MainCube>, &mut Transform)>,
+    scene_child_query: Query<&SceneChild>,
     mut game: ResMut<Game>,
-    scene_manager: Res<SceneSpawner>,
     commands: Commands,
 ) -> Bubble {
     let game = &mut *game;
     if game.phase == GamePhase::Play {
-        if let Some(unit) = game.units.get_unit_from_entity(click.target) {
+        let Ok(scene_child) = scene_child_query.get(click.target) else {
+            warn!("Err when getting scene_child");
+            return Bubble::Up;
+        };
+        if let Some(unit) = game.units.get_unit_from_entity(scene_child.parent_entity) {
             if let Some(cell) = game.board.get_cell(unit.coords) {
                 on_cell_clicked_play_phase(cell.plane, &mut query, game, commands);
             } else {

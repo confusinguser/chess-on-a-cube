@@ -38,7 +38,8 @@ pub(crate) enum UnitType {
     Rook,
     Bishop,
     King,
-    Pawn(RadialDirection),
+    /// (The direction that the pawn moves in, if the pawn has moved before)
+    Pawn(RadialDirection, bool),
     Knight,
     Queen,
 }
@@ -49,7 +50,7 @@ impl UnitType {
             UnitType::Rook => "rook",
             UnitType::Bishop => "bishop",
             UnitType::King => "king",
-            UnitType::Pawn(_) => "pawn",
+            UnitType::Pawn(_, _) => "pawn",
             UnitType::Knight => "knight",
             UnitType::Queen => "queen",
         }

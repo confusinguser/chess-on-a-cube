@@ -1,4 +1,4 @@
-use bevy::prelude::warn;
+use bevy::prelude::{error, warn};
 
 use crate::cell::{Board, CellCoordinates};
 use crate::gamemanager::{self, Game};
@@ -15,7 +15,9 @@ pub(crate) fn get_unit_moves(unit: &Unit, board: &Board, units: &Units) -> Vec<C
         UnitType::Rook => rook_movement(unit.coords, board, units),
         UnitType::Bishop => bishop_movement(unit.coords, board, units),
         UnitType::King => king_movement(unit.coords, board, units),
-        UnitType::Pawn(direction) => pawn_movement(unit.coords, board, units, direction),
+        UnitType::Pawn(direction, has_moved) => {
+            pawn_movement(unit.coords, board, units, direction, has_moved)
+        }
         UnitType::Knight => knight_movement(unit.coords, board, units),
         UnitType::Queen => queen_movement(unit.coords, board, units),
     }
@@ -74,7 +76,22 @@ fn pawn_movement(
     board: &Board,
     units: &Units,
     direction: RadialDirection,
+    has_moved: bool,
 ) -> Vec<CellCoordinates> {
+    let mut output = Vec::new();
+    let Some(one_step) = unit_coords.get_cell_in_radial_direction(direction, board.cube_side_length) else {
+        error!("Pawn has a direction that can't be walked in");
+        return output;
+    };
+    output.push(one_step.0);
+    if has_moved {
+        let two_steps = one_step
+            .0
+            .get_cell_in_radial_direction(direction, board.cube_side_length)
+            .unwrap();
+        output.push(two_steps.0);
+    }
+    output
 }
 
 fn knight_movement(
