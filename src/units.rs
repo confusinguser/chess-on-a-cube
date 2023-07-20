@@ -1,5 +1,6 @@
 use crate::cell::CellCoordinates;
 use crate::gamemanager::Team;
+use crate::utils::RadialDirection;
 use bevy::prelude::*;
 
 #[derive(Clone, Debug)]
@@ -32,12 +33,12 @@ impl Unit {
     }
 }
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub(crate) enum UnitType {
     Rook,
     Bishop,
     King,
-    Pawn,
+    Pawn(RadialDirection),
     Knight,
     Queen,
 }
@@ -48,10 +49,14 @@ impl UnitType {
             UnitType::Rook => "rook",
             UnitType::Bishop => "bishop",
             UnitType::King => "king",
-            UnitType::Pawn => "pawn",
+            UnitType::Pawn(_) => "pawn",
             UnitType::Knight => "knight",
             UnitType::Queen => "queen",
         }
+    }
+
+    pub(crate) fn can_capture_over_edge(&self) -> bool {
+        matches!(self, Self::Knight)
     }
 }
 

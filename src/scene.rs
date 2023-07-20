@@ -17,6 +17,23 @@ pub(crate) fn construct_cube(
     material: &StandardMaterial,
     game: &mut ResMut<Game>,
 ) {
+    fn choose_color(side_length: u32, i: u32, c1: CellColor, c2: CellColor) -> CellColor {
+        #[allow(clippy::collapsible_else_if)]
+        if side_length % 2 == 0 {
+            if (i / side_length + i % 2) % 2 == 0 {
+                c1
+            } else {
+                c2
+            }
+        } else {
+            if i % 2 == 0 {
+                c1
+            } else {
+                c2
+            }
+        }
+    }
+
     let plane_mesh: Handle<Mesh> = meshes.add(shape::Plane::default().into());
     let spacing = 1. / (side_length) as f32;
     let offset = 0.5 - spacing / 2.;
@@ -39,11 +56,7 @@ pub(crate) fn construct_cube(
                         (i / side_length % side_length) as f32 * spacing - offset,
                     );
                     rotation = Vec3::new(0., 0., 2.); // Up/down rotate 180 degrees, which is 2 turns
-                    color = if i % 2 == 0 {
-                        CellColor::White
-                    } else {
-                        CellColor::Gray
-                    };
+                    color = choose_color(side_length, i, CellColor::White, CellColor::Gray);
                     coords = CellCoordinates::new(
                         i % side_length + 1,
                         0,
@@ -58,11 +71,7 @@ pub(crate) fn construct_cube(
                         if side % 2 == 1 { 0.5 } else { -0.5 },
                     );
                     rotation = Vec3::new(1., 0., 0.);
-                    color = if i % 2 == 0 {
-                        CellColor::Black
-                    } else {
-                        CellColor::White
-                    };
+                    color = choose_color(side_length, i, CellColor::Black, CellColor::White);
                     coords = CellCoordinates::new(
                         i % side_length + 1,
                         i / side_length % side_length + 1,
@@ -77,11 +86,7 @@ pub(crate) fn construct_cube(
                         (i % side_length) as f32 * spacing - offset,
                     );
                     rotation = Vec3::new(0., 0., 1.);
-                    color = if i % 2 == 0 {
-                        CellColor::Gray
-                    } else {
-                        CellColor::Black
-                    };
+                    color = choose_color(side_length, i, CellColor::Gray, CellColor::Black);
                     coords = CellCoordinates::new(
                         0,
                         i / side_length % side_length + 1,
@@ -153,14 +158,12 @@ pub(crate) struct AddPickable;
 
 pub(crate) fn spawn_unit(
     commands: &mut Commands,
-    transform: Transform,
     asset_server: Res<AssetServer>,
     model_name: &str,
 ) -> Entity {
     let entity = commands
         .spawn((
             SceneBundle {
-                transform,
                 scene: asset_server.load(format!("models/{}.glb#Scene0", model_name)),
                 ..default()
             },
@@ -198,14 +201,20 @@ pub(crate) fn kill_unit(commands: &mut Commands, entity: Entity) {
 
 pub(crate) fn move_unit_entities(
     mut query: Query<(Option<&MainCube>, &mut Transform)>,
-    game: ResMut<Game>,
+    mut game: ResMut<Game>,
 ) {
     for unit_to_move in &game.units_to_move {
+        dbg!(unit_to_move);
         let plane = game.board.get_cell(unit_to_move.1).unwrap().plane;
-        let mut target_translation = query.get(plane).unwrap().1.translation;
-        let scale = 1. / game.board.cube_side_length as f32 / 3.;
-        target_translation += unit_to_move.1.normal_direction().as_vec3() * scale;
+        let target_translation = query.get(plane).unwrap().1.translation;
+        let scale = 3. / game.board.cube_side_length as f32;
+        let rotation =
+            Quat::from_rotation_arc(Vec3::Y, unit_to_move.1.normal_direction().as_vec3());
 
-        query.get_mut(unit_to_move.0).unwrap().1.translation = target_translation;
+        let mut transform_unit = query.get_mut(unit_to_move.0).unwrap().1;
+        transform_unit.translation = target_translation;
+        transform_unit.scale = Vec3::splat(scale);
+        transform_unit.rotation = rotation;
     }
+    game.units_to_move.clear();
 }

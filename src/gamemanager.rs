@@ -97,7 +97,13 @@ fn on_cell_clicked_place_units_phase(
     if game.units.get_unit(coords).is_none() {
         if let Some(mut unit) = game.stored_units.pop() {
             if unit.entity.is_none() {
-                spawn_unit_entity(&mut commands, &mut unit, coords, game, query, asset_server);
+                spawn_unit_entity(
+                    &mut commands,
+                    &mut unit,
+                    coords,
+                    &mut game.units_to_move,
+                    asset_server,
+                );
                 unit.coords = coords;
             }
             game.units.add_unit(unit);
@@ -176,12 +182,12 @@ fn on_cell_clicked_play_phase(
 
     // Mark cells
     reset_cells_new_selection(game);
-    if let Some(occupant) = game.units.get_unit(clicked_coords) {
-        if occupant.team != game.turn {
+    if let Some(unit) = game.units.get_unit(clicked_coords) {
+        if unit.team != game.turn {
             return;
         }
         // Mark which cells the selected unit can go to
-        let unit_moves = movement::get_unit_moves(occupant, &game.board, &game.units);
+        let unit_moves = movement::get_unit_moves(unit, &game.board, &game.units);
         for cell_coords in unit_moves {
             let cell = game.board.get_cell_mut(cell_coords);
             match cell {
@@ -189,7 +195,13 @@ fn on_cell_clicked_play_phase(
                     warn!("Cell {:?} doesn't exist", cell_coords);
                 }
                 Some(cell) => {
-                    cell.selected_unit_can_move_to = true;
+                    // Check so normal pieces can't capture over edge
+                    if unit.unit_type.can_capture_over_edge()
+                        || !game.units.is_unit_at(cell_coords)
+                        || unit.coords.normal_direction() == cell_coords.normal_direction()
+                    {
+                        cell.selected_unit_can_move_to = true;
+                    }
                 }
             }
         }
@@ -206,23 +218,19 @@ pub(crate) fn spawn_unit_entity(
     commands: &mut Commands,
     unit: &mut Unit,
     coords: CellCoordinates,
-    game: &Game,
-    query: &mut Query<(Option<&MainCube>, &mut Transform)>,
+    units_to_move: &mut Vec<(Entity, CellCoordinates)>,
     asset_server: Res<AssetServer>,
 ) {
-    let plane = game.board.get_cell(coords).unwrap().plane;
-    let mut translation = query.get(plane).unwrap().1.translation;
-    let scale = 1. / game.board.cube_side_length as f32 / 3.;
-    translation += coords.normal_direction().as_vec3() * scale;
-    let transform = Transform::from_translation(translation).with_scale(Vec3::splat(scale));
-    let model_name = unit.unit_type.model_name();
-    let entity = scene::spawn_unit(commands, transform, asset_server, model_name);
-    unit.set_entity(entity);
-}
+    // let plane = game.board.get_cell(coords).unwrap().plane;
+    // let mut translation = query.get(plane).unwrap().1.translation;
+    // let scale = 1. / game.board.cube_side_length as f32 / 3.;
+    // translation += coords.normal_direction().as_vec3() * scale;
+    // let transform = Transform::from_translation(translation).with_scale(Vec3::splat(scale));
 
-pub(crate) fn move_unit_entity(game_move: GameMove, game: &mut Game) {
-    let Some(Some(entity)) = game.units.get_unit(game_move.from).map(|unit| unit.entity) else {return;};
-    game.units_to_move.push((entity, game_move.to));
+    let model_name = unit.unit_type.model_name();
+    let entity = scene::spawn_unit(commands, asset_server, model_name);
+    units_to_move.push((entity, coords));
+    unit.set_entity(entity);
 }
 
 //TODO fix

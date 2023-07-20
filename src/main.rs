@@ -26,7 +26,7 @@ fn main() {
                 .build()
                 .disable::<DefaultHighlightingPlugin>(),
         )
-        .insert_resource(gamemanager::Game::new(3))
+        .insert_resource(gamemanager::Game::new(4))
         .add_startup_system(setup)
         .add_system(cube_rotation::rotate)
         .add_system(scene::update_cell_colors)

@@ -1,3 +1,5 @@
+use bevy::prelude::warn;
+
 use crate::cell::{Board, CellCoordinates};
 use crate::gamemanager::{self, Game};
 use crate::units::*;
@@ -13,7 +15,7 @@ pub(crate) fn get_unit_moves(unit: &Unit, board: &Board, units: &Units) -> Vec<C
         UnitType::Rook => rook_movement(unit.coords, board, units),
         UnitType::Bishop => bishop_movement(unit.coords, board, units),
         UnitType::King => king_movement(unit.coords, board, units),
-        UnitType::Pawn => todo!(),
+        UnitType::Pawn(direction) => pawn_movement(unit.coords, board, units, direction),
         UnitType::Knight => knight_movement(unit.coords, board, units),
         UnitType::Queen => queen_movement(unit.coords, board, units),
     }
@@ -67,6 +69,14 @@ fn queen_movement(
     out
 }
 
+fn pawn_movement(
+    unit_coords: CellCoordinates,
+    board: &Board,
+    units: &Units,
+    direction: RadialDirection,
+) -> Vec<CellCoordinates> {
+}
+
 fn knight_movement(
     unit_coords: CellCoordinates,
     board: &Board,
@@ -82,7 +92,8 @@ pub(crate) fn make_move(game_move: GameMove, game: &mut Game) -> bool {
     }
 
     unit.move_unit_to(game_move.to);
-    gamemanager::move_unit_entity(game_move, game);
+    let Some(entity) = unit.entity else {warn!("Unit entity was None");return false;};
+    game.units_to_move.push((entity, game_move.to));
     true
 }
 

@@ -47,7 +47,7 @@ pub(crate) fn first_nonzero_component(v: Vec3) -> Option<u32> {
     None
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub(crate) enum RadialDirection {
     ClockwiseX,
     CounterX,
@@ -219,6 +219,10 @@ impl CartesianDirection {
         &self,
         other: CartesianDirection,
     ) -> Option<CartesianDirection> {
+        if self.abs() == other.abs() {
+            // Both are on same axis, so there are two perpendiculars
+            return None;
+        }
         for axis_num in 0..3 {
             if self.axis_num() != axis_num && other.axis_num() != axis_num {
                 return Some(CartesianDirection::from_axis_num(axis_num, true));
