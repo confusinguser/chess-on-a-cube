@@ -1,3 +1,5 @@
+use std::slice::IterMut;
+
 use crate::cell::CellCoordinates;
 use crate::gamemanager::Team;
 use crate::utils::RadialDirection;
@@ -96,5 +98,25 @@ impl Units {
 
     pub(crate) fn add_unit(&mut self, unit: Unit) {
         self.units.push(unit)
+    }
+
+    pub(crate) fn game_starting_configuration(cube_side_length: u32) -> Units {
+        let mut output = Units::default();
+        let unit = Unit::new(
+            UnitType::Pawn(RadialDirection::ClockwiseX, false),
+            Team::White,
+            CellCoordinates::new(1, 1, 0, true),
+        );
+        let mut unit2 = unit.clone();
+        output.add_unit(unit);
+        unit2.team = Team::Black;
+        unit2.unit_type = UnitType::King;
+        unit2.coords = unit2.coords.opposite(cube_side_length);
+        output.add_unit(unit2);
+        output
+    }
+
+    pub(crate) fn all_units_iter_mut(&mut self) -> IterMut<Unit> {
+        self.units.iter_mut()
     }
 }

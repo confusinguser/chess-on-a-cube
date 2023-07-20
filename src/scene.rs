@@ -6,7 +6,7 @@ use std::f32::consts::PI;
 use bevy::prelude::Vec3;
 
 use crate::cell::{Cell, CellColor, CellCoordinates};
-use crate::gamemanager::{self, Game};
+use crate::gamemanager::{self, spawn_unit_entity, Game};
 use crate::materials;
 
 pub(crate) fn construct_cube(
@@ -152,13 +152,13 @@ pub(crate) fn update_cell_colors(
     }
 }
 
-/// A "flag" to make a separate system add the pickable tasks to our unit entities
+/// A "flag" to make a separate system do various things with the created entities
 #[derive(Component, Default, Debug)]
-pub(crate) struct AddPickable;
+pub(crate) struct PrepareUnit;
 
 pub(crate) fn spawn_unit(
     commands: &mut Commands,
-    asset_server: Res<AssetServer>,
+    asset_server: &AssetServer,
     model_name: &str,
 ) -> Entity {
     let entity = commands
@@ -167,7 +167,7 @@ pub(crate) fn spawn_unit(
                 scene: asset_server.load(format!("models/{}.glb#Scene0", model_name)),
                 ..default()
             },
-            AddPickable,
+            PrepareUnit,
         ))
         .id();
     entity
@@ -179,40 +179,66 @@ pub(crate) struct SceneChild {
 }
 
 /// Add pickable and change material color
-pub(crate) fn add_pickable_to_unit(
+pub(crate) fn prepare_unit_entity(
     mut commands: Commands,
-    mut unloaded_instances: Query<(Entity, &SceneInstance), With<AddPickable>>,
+    mut unloaded_instances: Query<(Entity, &SceneInstance), With<PrepareUnit>>,
     mut material_query: Query<&mut Handle<StandardMaterial>>,
     game: Res<Game>,
     scene_manager: Res<SceneSpawner>,
     mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
     for (parent_entity, instance) in unloaded_instances.iter_mut() {
-        if scene_manager.instance_is_ready(**instance) {
-            commands.entity(parent_entity).remove::<AddPickable>();
+        if !scene_manager.instance_is_ready(**instance) {
+            continue;
+        }
+        commands.entity(parent_entity).remove::<PrepareUnit>();
 
-            let unit = game.units.get_unit_from_entity(parent_entity);
-            let color = unit.unwrap().team.color();
+        let unit = game.units.get_unit_from_entity(parent_entity);
+        let color = unit.unwrap().team.color();
 
-            // Iterate over all entities in scene (once it's loaded)
-            let handles = scene_manager.iter_instance_entities(**instance);
-            for entity in handles {
-                commands.entity(entity).insert((
-                    PickableBundle::default(),
-                    RaycastPickTarget::default(),
-                    OnPointer::<Click>::run_callback(gamemanager::on_unit_clicked),
-                    SceneChild { parent_entity },
-                ));
+        // Iterate over all entities in scene (once it's loaded)
+        let handles = scene_manager.iter_instance_entities(**instance);
+        for entity in handles {
+            commands.entity(entity).insert((
+                PickableBundle::default(),
+                RaycastPickTarget::default(),
+                OnPointer::<Click>::run_callback(gamemanager::on_unit_clicked),
+                SceneChild { parent_entity },
+            ));
 
-                let material = material_query.get_mut(entity);
-                if let Ok(material) = material {
-                    let material = materials.get_mut(material.into_inner());
-                    if let Some(material) = material {
-                        material.base_color = color;
-                    }
-                }
+            let material_handle = material_query.get_mut(entity);
+            // Every scene, which in our case corresponds to one unit entity, has one material
+            // handle, therefore we clone it before changing color
+            if let Ok(material_handle) = material_handle {
+                let material_handle = material_handle.into_inner();
+                let material = materials.get_mut(material_handle).unwrap();
+                let mut material_cloned = material.clone();
+                material_cloned.base_color = color;
+                let material_cloned_handle = materials.add(material_cloned);
+                *material_handle = material_cloned_handle;
             }
         }
+    }
+}
+
+pub(crate) fn spawn_missing_unit_entities(
+    mut commands: Commands,
+    mut game: ResMut<Game>,
+    asset_server: Res<AssetServer>,
+) {
+    let game = &mut *game;
+    let asset_server = &*asset_server;
+    for unit in game
+        .units
+        .all_units_iter_mut()
+        .filter(|unit| unit.entity.is_none())
+    {
+        spawn_unit_entity(
+            &mut commands,
+            unit,
+            &mut game.entities_to_move,
+            asset_server,
+        )
     }
 }
 
@@ -224,18 +250,17 @@ pub(crate) fn move_unit_entities(
     mut query: Query<(Option<&MainCube>, &mut Transform)>,
     mut game: ResMut<Game>,
 ) {
-    for unit_to_move in &game.units_to_move {
-        dbg!(unit_to_move);
+    for unit_to_move in &game.entities_to_move {
         let plane = game.board.get_cell(unit_to_move.1).unwrap().plane;
         let target_translation = query.get(plane).unwrap().1.translation;
         let scale = 3. / game.board.cube_side_length as f32;
         let rotation =
             Quat::from_rotation_arc(Vec3::Y, unit_to_move.1.normal_direction().as_vec3());
 
-        let mut transform_unit = query.get_mut(unit_to_move.0).unwrap().1;
-        transform_unit.translation = target_translation;
-        transform_unit.scale = Vec3::splat(scale);
-        transform_unit.rotation = rotation;
+        let mut transform_entity = query.get_mut(unit_to_move.0).unwrap().1;
+        transform_entity.translation = target_translation;
+        transform_entity.scale = Vec3::splat(scale);
+        transform_entity.rotation = rotation;
     }
-    game.units_to_move.clear();
+    game.entities_to_move.clear();
 }

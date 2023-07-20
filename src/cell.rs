@@ -186,6 +186,21 @@ impl CellCoordinates {
             panic!("No zero field on CellCoordinates: {:?}", self);
         }
     }
+
+    pub(crate) fn opposite(&self, cube_side_length: u32) -> CellCoordinates {
+        let mut out = *self;
+        out.normal_is_positive = !out.normal_is_positive;
+        if out.x != 0 {
+            out.x = cube_side_length + 1 - out.x;
+        }
+        if out.y != 0 {
+            out.y = cube_side_length + 1 - out.y;
+        }
+        if out.z != 0 {
+            out.z = cube_side_length + 1 - out.z;
+        }
+        out
+    }
 }
 
 impl Index<usize> for CellCoordinates {

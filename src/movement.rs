@@ -129,7 +129,7 @@ pub(crate) fn make_move(game_move: GameMove, game: &mut Game) -> bool {
 
     unit.move_unit_to(game_move.to);
     let Some(entity) = unit.entity else {warn!("Unit entity was None");return false;};
-    game.units_to_move.push((entity, game_move.to));
+    game.entities_to_move.push((entity, game_move.to));
     true
 }
 
