@@ -47,6 +47,16 @@ pub(crate) fn first_nonzero_component(v: Vec3) -> Option<u32> {
     None
 }
 
+pub(crate) fn nonzero_components(v: Vec3) -> Vec<u32> {
+    let mut output = Vec::new();
+    for i in 0..3 {
+        if v[i] != 0. {
+            output.push(i as u32);
+        }
+    }
+    output
+}
+
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub(crate) enum RadialDirection {
     ClockwiseX,
@@ -154,6 +164,26 @@ impl CartesianDirection {
             output = output.negate();
         }
         output
+    }
+
+    /// `vec` is almost a cartesian direction
+    pub(crate) fn from_vec3_round(mut vec: Vec3) -> Option<Self> {
+        for i in 0..3 {
+            vec[i] = vec[i].round()
+        }
+
+        if nonzero_components(vec).len() != 1 {
+            return None;
+        }
+
+        let Some(axis_num) = first_nonzero_component(vec) else {
+            return None;
+        };
+
+        Some(Self::from_axis_num(
+            axis_num,
+            vec[axis_num as usize].signum() > 0.,
+        ))
     }
 
     pub(crate) fn as_vec3(&self) -> Vec3 {

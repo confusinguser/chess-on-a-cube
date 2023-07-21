@@ -1,4 +1,4 @@
-use crate::utils;
+use crate::utils::{self, CartesianDirection};
 use crate::MainCamera;
 use bevy::prelude::*;
 use std::f32::consts::PI;
@@ -26,7 +26,7 @@ pub(crate) fn rotate(
                 // When spinning around the y-axis we are also spinning the location of the x-axis. We
                 // always want the "x-axis" to be the left face of the cube seen from the camera
                 let mut axis =
-                    new_axis_on_side_after_rotation($axis, rotation_data.current_rotation) * PI / 2.;
+                    new_axis_on_side_after_rotation($axis, rotation_data.current_rotation).expect("Current rotation does not have anything other than quarter turns").as_vec3() * PI / 2.;
                 let mut axis_num = utils::first_nonzero_component(axis).unwrap() as usize;
                 if axis_num == 2 {
                     axis = Vec3::new(axis[axis_num],0.,0.);
@@ -42,10 +42,10 @@ pub(crate) fn rotate(
     }
 
     // Input
-    input_handling!(KeyCode::Left, -Vec3::Y);
-    input_handling!(KeyCode::Right, Vec3::Y);
-    input_handling!(KeyCode::Down, Vec3::Z);
-    input_handling!(KeyCode::Up, -Vec3::Z);
+    input_handling!(KeyCode::Left, CartesianDirection::NegY);
+    input_handling!(KeyCode::Right, CartesianDirection::Y);
+    input_handling!(KeyCode::Down, CartesianDirection::Z);
+    input_handling!(KeyCode::Up, CartesianDirection::NegZ);
 
     let mut rotation_needed = rotation_data.current_rotation;
 
@@ -132,22 +132,26 @@ fn rotation_curve(time: f32) -> f32 {
     1. + c3 * (time - 1.).powi(3) + c1 * (time - 1.).powi(2)
 }
 
-fn direction_after_rotation(direction: Vec3, rot: Quat) -> Vec3 {
-    rot.mul_vec3(direction)
+fn direction_after_rotation(
+    direction: CartesianDirection,
+    rot: Quat,
+) -> Option<CartesianDirection> {
+    CartesianDirection::from_vec3_round(rot.mul_vec3(direction.as_vec3()))
 }
 
-fn new_axis_on_side_after_rotation(normal_of_side: Vec3, rot: Quat) -> Vec3 {
-    let directions = [Vec3::X, Vec3::Y, Vec3::Z];
-
-    for direction in directions {
-        let rotated_dir = direction_after_rotation(direction, rot);
-        let shared_component_sign =
-            utils::vectors_shared_component_sign(rotated_dir, normal_of_side);
-        if shared_component_sign != 0 {
-            return direction * shared_component_sign as f32;
+fn new_axis_on_side_after_rotation(
+    normal: CartesianDirection,
+    rot: Quat,
+) -> Option<CartesianDirection> {
+    for direction in CartesianDirection::directions() {
+        let Some(rotated_dir) = direction_after_rotation(direction, rot) else {
+            return None;
+        };
+        if rotated_dir == normal {
+            return Some(direction);
         }
     }
-    Vec3::ZERO
+    unreachable!()
 }
 
 /// # Arguments
@@ -176,5 +180,26 @@ fn animate_axis(
         *time_started_rotation = Duration::default();
         *current_rotation *=
             Quat::from_euler(axis, if reversed { -1. } else { 1. } * PI / 2., 0., 0.);
+    }
+}
+
+mod tests {
+    use bevy::prelude::*;
+
+    use crate::cube_rotation::new_axis_on_side_after_rotation;
+    use crate::utils::CartesianDirection;
+
+    #[test]
+    fn new_axis_on_side_after_rotation_test() {
+        for direction in CartesianDirection::directions() {
+            for direction2 in CartesianDirection::directions() {
+                let o = new_axis_on_side_after_rotation(
+                    direction,
+                    Quat::from_rotation_arc(direction2.as_vec3(), direction.as_vec3()),
+                )
+                .unwrap();
+                assert_eq!(o, direction2, "From: {:?}, to: {:?}", direction2, direction)
+            }
+        }
     }
 }
