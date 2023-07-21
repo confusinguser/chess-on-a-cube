@@ -85,7 +85,6 @@ fn pawn_movement(
         error!("Pawn has a direction that can't be walked in");
         return Vec::new();
     }
-
     let mut output = parts::get_cells_in_direction(
         unit_coords,
         if has_moved { 1 } else { 2 },

@@ -15,6 +15,7 @@ pub(crate) struct Game {
     pub(crate) stored_units: Vec<Unit>,
     pub(crate) turn: Team,
     pub(crate) entities_to_move: Vec<(Entity, CellCoordinates)>,
+    pub(crate) palette: Palette,
 }
 impl Game {
     pub(crate) fn new(cube_side_length: u32) -> Self {
@@ -26,11 +27,35 @@ impl Game {
             stored_units: vec![],
             turn: Team::White,
             entities_to_move: Vec::new(),
+            palette: Palette::Pinkish,
         }
     }
 
     fn next_player_turn(&mut self) {
         self.turn = self.turn.opposite()
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub(crate) enum Palette {
+    Filippa,
+    Pinkish,
+}
+
+impl Palette {
+    fn get_colors_str(&self) -> [&str; 3] {
+        match self {
+            Self::Filippa => ["473A2A", "A7805E", "ECC998"],
+            Self::Pinkish => ["B23A48", "FB9489", "FCB8B0"],
+        }
+    }
+
+    pub(crate) fn get_colors(&self) -> [Color; 3] {
+        let mut output: [Color; 3] = Default::default();
+        for (i, str) in self.get_colors_str().iter().enumerate() {
+            output[i] = Color::hex(str).unwrap();
+        }
+        output
     }
 }
 
@@ -168,14 +193,12 @@ fn on_cell_clicked_play_phase(
                     to: clicked_coords,
                 };
                 if movement::make_move(game_move, game) {
-                    if let Some(UnitType::Pawn(_, ref mut first_move)) = game
-                        .units
-                        .get_unit_mut(clicked_coords)
-                        .map(|unit| unit.unit_type)
-                    {
-                        *first_move = false;
+                    if let Some(unit) = game.units.get_unit_mut(clicked_coords) {
+                        if let UnitType::Pawn(_, ref mut has_moved) = unit.unit_type {
+                            *has_moved = true;
+                        }
+                        game.next_player_turn();
                     }
-                    game.next_player_turn();
                 }
             }
         }

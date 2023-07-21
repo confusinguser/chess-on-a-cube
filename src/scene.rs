@@ -68,8 +68,8 @@ pub(crate) fn construct_cube(
                     color = choose_color(
                         side_length,
                         i,
-                        CellColor::White,
-                        CellColor::Gray,
+                        CellColor::Bright,
+                        CellColor::Mid,
                         side % 2 == 0,
                     );
                     coords = CellCoordinates::new(
@@ -89,8 +89,8 @@ pub(crate) fn construct_cube(
                     color = choose_color(
                         side_length,
                         i,
-                        CellColor::Black,
-                        CellColor::White,
+                        CellColor::Dark,
+                        CellColor::Bright,
                         side % 2 == 1,
                     );
                     coords = CellCoordinates::new(
@@ -110,8 +110,8 @@ pub(crate) fn construct_cube(
                     color = choose_color(
                         side_length,
                         i,
-                        CellColor::Gray,
-                        CellColor::Black,
+                        CellColor::Mid,
+                        CellColor::Dark,
                         side % 2 == 0,
                     );
                     coords = CellCoordinates::new(
@@ -170,11 +170,11 @@ pub(crate) fn update_cell_colors(
         let query_result = query.get(plane).unwrap();
         let material = materials.get_mut(query_result.0).unwrap();
         if game.selected_cell.map_or(false, |x| x == cell.coords) {
-            materials::select_cell_material(material, cell.color);
+            materials::select_cell_material(material, game.palette, cell.color);
         } else if cell.selected_unit_can_move_to {
-            materials::can_go_cell_material(material, cell.color);
+            materials::can_go_cell_material(material, game.palette, cell.color);
         } else {
-            materials::normal_cell_material(material, cell.color);
+            materials::normal_cell_material(material, game.palette, cell.color);
         }
     }
 }

@@ -139,6 +139,9 @@ impl Units {
         unit_mirror_pawn!(White walking in ClockwiseY at (3, 4, 0, true));
         unit_mirror_pawn!(White walking in CounterX at (4, 3, 0, true));
         unit_mirror_pawn!(White walking in ClockwiseZ at (0, 3, 4, true));
+        unit_mirror_pawn!(White walking in CounterY at (0, 4, 3, true));
+        unit_mirror_pawn!(White walking in ClockwiseX at (4, 0, 3, true));
+        unit_mirror_pawn!(White walking in CounterZ at (3, 0, 4, true));
 
         output
     }

@@ -3,6 +3,7 @@ use std::ops::{Index, IndexMut};
 
 use bevy::prelude::*;
 
+use crate::gamemanager::Palette;
 use crate::utils::{self, CartesianDirection, RadialDirection};
 
 #[derive(Clone, Debug)]
@@ -26,9 +27,19 @@ impl Cell {
 
 #[derive(Clone, Debug, Copy)]
 pub(crate) enum CellColor {
-    White,
-    Black,
-    Gray,
+    Bright,
+    Mid,
+    Dark,
+}
+
+impl CellColor {
+    pub(crate) fn base_color(&self, palette: Palette) -> Color {
+        palette.get_colors()[match self {
+            Self::Bright => 0,
+            Self::Mid => 1,
+            Self::Dark => 2,
+        }]
+    }
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Default)]
