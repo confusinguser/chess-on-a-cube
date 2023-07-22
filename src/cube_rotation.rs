@@ -184,18 +184,16 @@ fn animate_axis(
 }
 
 mod tests {
-    use bevy::prelude::*;
-
-    use crate::cube_rotation::new_axis_on_side_after_rotation;
-    use crate::utils::CartesianDirection;
-
     #[test]
     fn new_axis_on_side_after_rotation_test() {
-        for direction in CartesianDirection::directions() {
-            for direction2 in CartesianDirection::directions() {
-                let o = new_axis_on_side_after_rotation(
+        for direction in crate::utils::CartesianDirection::directions() {
+            for direction2 in crate::utils::CartesianDirection::directions() {
+                let o = crate::cube_rotation::new_axis_on_side_after_rotation(
                     direction,
-                    Quat::from_rotation_arc(direction2.as_vec3(), direction.as_vec3()),
+                    bevy::prelude::Quat::from_rotation_arc(
+                        direction2.as_vec3(),
+                        direction.as_vec3(),
+                    ),
                 )
                 .unwrap();
                 assert_eq!(o, direction2, "From: {:?}, to: {:?}", direction2, direction)

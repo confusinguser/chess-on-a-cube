@@ -37,6 +37,7 @@ impl Game {
 }
 
 #[derive(Debug, Clone, Copy)]
+#[allow(unused)]
 pub(crate) enum Palette {
     Filippa,
     Pinkish,
