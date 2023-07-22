@@ -279,7 +279,7 @@ mod parts {
                 continue;
             }
 
-            for direction_2 in [left_right_axis, left_right_axis.negate()] {
+            for direction_2 in [left_right_axis, left_right_axis.opposite()] {
                 let endpoint = forward_two
                     .0
                     .get_cell_in_direction(direction_2, cube_side_length)

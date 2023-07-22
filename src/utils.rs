@@ -142,7 +142,7 @@ impl CartesianDirection {
         };
 
         if !is_positive {
-            output = output.negate();
+            output = output.opposite();
         }
         output
     }
@@ -178,7 +178,7 @@ impl CartesianDirection {
         }
     }
 
-    fn is_negative(&self) -> bool {
+    pub(crate) fn is_negative(&self) -> bool {
         match self {
             Self::X | Self::Y | Self::Z => false,
             Self::NegX | Self::NegY | Self::NegZ => true,
@@ -202,7 +202,7 @@ impl CartesianDirection {
     }
 
     #[must_use]
-    pub(crate) fn negate(&self) -> CartesianDirection {
+    pub(crate) fn opposite(&self) -> CartesianDirection {
         match self {
             Self::X => Self::NegX,
             Self::NegX => Self::X,
