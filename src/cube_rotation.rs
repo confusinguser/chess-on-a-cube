@@ -130,11 +130,6 @@ pub(crate) fn rotate(
 
         camera.0 = transform;
     }
-    dbg!(
-        camera_rotation_up_needed,
-        &rotation_data,
-        rotation_data.current_rotation.mul_vec3(Vec3::splat(1.))
-    );
 }
 
 fn animate_camera_rotation(
@@ -318,7 +313,6 @@ mod tests {
 
                 let camera_loc = rot.inverse().mul_vec3(bevy::prelude::Vec3::splat(1.));
 
-                dbg!(camera_loc, o, to, from);
                 if (camera_loc[o.axis_num() as usize] < 0.) != o.is_negative() {
                     panic!("The side given back by function is not currently visible");
                 }

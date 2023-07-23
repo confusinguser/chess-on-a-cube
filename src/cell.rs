@@ -238,7 +238,7 @@ impl IndexMut<usize> for CellCoordinates {
     }
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub(crate) struct Board {
     board: BTreeMap<CellCoordinates, Cell>,
     pub(crate) cube_side_length: u32,

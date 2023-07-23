@@ -76,12 +76,26 @@ impl RadialDirection {
         }
     }
 
+    #[allow(dead_code)]
+    pub(crate) fn opposite(&self) -> RadialDirection {
+        match self {
+            Self::ClockwiseX => Self::CounterX,
+            Self::CounterX => Self::ClockwiseX,
+            Self::ClockwiseY => Self::CounterY,
+            Self::CounterY => Self::ClockwiseY,
+            Self::ClockwiseZ => Self::CounterZ,
+            Self::CounterZ => Self::ClockwiseZ,
+        }
+    }
+
     pub(crate) fn to_cartesian_direction(
         self,
         normal: CartesianDirection,
     ) -> Option<CartesianDirection> {
         if normal.abs() == self.rotation_axis().abs() {
-            warn!("utils::radial_direction_to_cartesian_direction called with radial_direction on same axis as normal");
+            warn!(
+                "Tried to convert radial direction to cartesian direction on same axis as normal"
+            );
             return None;
         }
 

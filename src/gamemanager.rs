@@ -1,5 +1,5 @@
 use crate::movement::GameMove;
-use crate::{movement, units::*};
+use crate::{ai, movement, units::*};
 
 use crate::cell::*;
 use crate::scene::{self, MainCube, SceneChild};
@@ -16,6 +16,7 @@ pub(crate) struct Game {
     pub(crate) turn: Team,
     pub(crate) entities_to_move: Vec<(Entity, CellCoordinates)>,
     pub(crate) palette: Palette,
+    pub(crate) ai_playing: Option<Team>,
 }
 impl Game {
     pub(crate) fn new(cube_side_length: u32) -> Self {
@@ -28,6 +29,7 @@ impl Game {
             turn: Team::White,
             entities_to_move: Vec::new(),
             palette: Palette::Pinkish,
+            ai_playing: Some(Team::Black),
         }
     }
 
@@ -155,52 +157,17 @@ fn on_cell_clicked_play_phase(
 
     let clicked_cell = game.board.get_cell_mut(clicked_coords).unwrap();
 
-    fn capture_unit(
-        commands: &mut Commands,
-        captured_unit_coords: CellCoordinates,
-        units: &mut Units,
-        turn: Team,
-    ) -> bool {
-        let captured_unit = units.get_unit_mut(captured_unit_coords);
-        if let Some(captured_unit) = captured_unit {
-            if captured_unit.team == turn {
-                return false;
-            }
-            if let Some(entity) = captured_unit.entity {
-                scene::kill_unit(commands, entity);
-            };
-            captured_unit.dead = true;
-            units.remove_dead_units();
-        }
-        true
-    }
-
     if clicked_cell.selected_unit_can_move_to {
-        let mut should_move = true;
-        if game.units.is_unit_at(clicked_coords) {
-            should_move = capture_unit(
-                &mut commands,
-                clicked_coords, // captured_unit_coords
-                &mut game.units,
-                game.turn,
-            );
-        }
-
         // Move selected unit
-        if should_move {
-            if let Some(from) = old_selected_cell {
-                let game_move = GameMove {
-                    from,
-                    to: clicked_coords,
-                };
-                if movement::make_move(game_move, game) {
-                    if let Some(unit) = game.units.get_unit_mut(clicked_coords) {
-                        if let UnitType::Pawn(_, ref mut has_moved) = unit.unit_type {
-                            *has_moved = true;
-                        }
-                        game.next_player_turn();
-                    }
-                }
+        if let Some(from) = old_selected_cell {
+            let game_move = GameMove {
+                from,
+                to: clicked_coords,
+            };
+            if make_move(game_move, game, &mut commands)
+                && game.units.get_unit_mut(clicked_coords).is_some()
+            {
+                game.next_player_turn();
             }
         }
     }
@@ -233,6 +200,33 @@ fn on_cell_clicked_play_phase(
             }
         }
     }
+}
+
+pub(crate) fn make_move(game_move: GameMove, game: &mut Game, commands: &mut Commands) -> bool {
+    let captured_unit = game.units.get_unit_mut(game_move.to);
+    if let Some(captured_unit) = captured_unit {
+        if captured_unit.team == game.turn {
+            return false;
+        }
+        if let Some(entity) = captured_unit.entity {
+            scene::kill_unit(commands, entity);
+        };
+        captured_unit.dead = true;
+        game.units.remove_dead_units();
+    }
+
+    let Some(unit) = game.units.get_unit_mut(game_move.from) else {return false};
+    if unit.team != game.turn {
+        return false;
+    }
+
+    unit.move_unit_to(game_move.to);
+    let Some(entity) = unit.entity else {warn!("Unit entity was None");return false;};
+    game.entities_to_move.push((entity, game_move.to));
+    if let UnitType::Pawn(_, ref mut has_moved) = unit.unit_type {
+        *has_moved = true;
+    }
+    true
 }
 
 fn reset_cells_new_selection(game: &mut Game) {
@@ -277,4 +271,16 @@ pub(crate) fn on_unit_clicked(
         }
     }
     Bubble::Burst
+}
+
+pub(crate) fn ai_play(mut game: ResMut<Game>, mut commands: Commands) {
+    if game
+        .ai_playing
+        .map_or(false, |ai_playing| ai_playing == game.turn)
+    {
+        // It is AI's turn
+        let next_move = ai::next_move(&game.board, &game.units, game.turn, 2);
+        make_move(next_move, &mut game, &mut commands);
+        game.next_player_turn();
+    }
 }

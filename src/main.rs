@@ -1,3 +1,4 @@
+mod ai;
 mod cell;
 mod cube_rotation;
 mod gamemanager;
@@ -33,6 +34,7 @@ fn main() {
         .add_system(scene::prepare_unit_entity.run_if(any_with_component::<scene::PrepareUnit>()))
         .add_system(scene::move_unit_entities)
         .add_system(scene::spawn_missing_unit_entities)
+        .add_system(gamemanager::ai_play)
         .run();
 }
 

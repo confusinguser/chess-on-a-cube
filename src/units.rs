@@ -1,4 +1,4 @@
-use std::slice::IterMut;
+use std::slice::{Iter, IterMut};
 
 use crate::cell::CellCoordinates;
 use crate::gamemanager::Team;
@@ -64,7 +64,7 @@ impl UnitType {
     }
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub(crate) struct Units {
     units: Vec<Unit>,
 }
@@ -124,9 +124,11 @@ impl Units {
                     Team::$color,
                     CellCoordinates::new($x, $y, $z, $normal_positive),
                 );
-                let mut unit2 = unit.clone();
-                unit2.coords = unit2.coords.opposite(cube_side_length);
-                unit2.team = unit.team.opposite();
+                let unit2 = Unit::new(
+                    UnitType::Pawn(RadialDirection::$direction, false),
+                    Team::$color.opposite(),
+                    CellCoordinates::new($x, $y, $z, $normal_positive).opposite(cube_side_length),
+                );
                 output.add_unit(unit);
                 output.add_unit(unit2);
             };
@@ -148,5 +150,17 @@ impl Units {
 
     pub(crate) fn all_units_iter_mut(&mut self) -> IterMut<Unit> {
         self.units.iter_mut()
+    }
+
+    pub(crate) fn all_units_iter(&self) -> Iter<Unit> {
+        self.units.iter()
+    }
+
+    pub(crate) fn remove_unit(&mut self, coords: CellCoordinates) -> Option<Unit> {
+        let Some(index) = self.units.iter().position(|unit| unit.coords==coords) else {
+            return None;
+        };
+
+        Some(self.units.swap_remove(index))
     }
 }

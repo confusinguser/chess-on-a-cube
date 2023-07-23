@@ -1,17 +1,18 @@
-use bevy::prelude::{error, warn};
+use bevy::prelude::error;
 
 use crate::cell::{Board, CellCoordinates};
-use crate::gamemanager::Game;
+
 use crate::units::*;
 use crate::utils::{CartesianDirection, RadialDirection};
 
+#[derive(Clone, Copy, Debug)]
 pub(crate) struct GameMove {
     pub(crate) from: CellCoordinates,
     pub(crate) to: CellCoordinates,
 }
 
 pub(crate) fn get_unit_moves(unit: &Unit, board: &Board, units: &Units) -> Vec<CellCoordinates> {
-    match unit.unit_type {
+    let mut moves = match unit.unit_type {
         UnitType::Rook => rook_movement(unit.coords, board, units),
         UnitType::Bishop => bishop_movement(unit.coords, board, units),
         UnitType::King => king_movement(unit.coords, board, units),
@@ -20,7 +21,20 @@ pub(crate) fn get_unit_moves(unit: &Unit, board: &Board, units: &Units) -> Vec<C
         }
         UnitType::Knight => knight_movement(unit.coords, board, units),
         UnitType::Queen => queen_movement(unit.coords, board, units),
-    }
+    };
+
+    moves.retain(|move_to| {
+        if move_to.normal_direction() == unit.coords.normal_direction()
+            || unit.unit_type == UnitType::Knight
+        {
+            units
+                .get_unit(*move_to)
+                .map_or(true, |other_unit| other_unit.team != unit.team)
+        } else {
+            !units.is_unit_at(*move_to)
+        }
+    });
+    moves
 }
 
 fn king_movement(
@@ -82,7 +96,10 @@ fn pawn_movement(
         .to_cartesian_direction(unit_coords.normal_direction())
         .is_none()
     {
-        error!("Pawn has a direction that can't be walked in");
+        error!(
+            "Pawn has a direction that can't be walked in: Coords: {:?}, direction: {:?}",
+            unit_coords, direction
+        );
         return Vec::new();
     }
     let mut output = parts::get_cells_in_direction(
@@ -122,18 +139,6 @@ fn knight_movement(
     _units: &Units,
 ) -> Vec<CellCoordinates> {
     parts::get_knight_moves(unit_coords, 1, board.cube_side_length)
-}
-
-pub(crate) fn make_move(game_move: GameMove, game: &mut Game) -> bool {
-    let Some(unit) = game.units.get_unit_mut(game_move.from) else {return false};
-    if unit.team != game.turn {
-        return false;
-    }
-
-    unit.move_unit_to(game_move.to);
-    let Some(entity) = unit.entity else {warn!("Unit entity was None");return false;};
-    game.entities_to_move.push((entity, game_move.to));
-    true
 }
 
 /// Parts to create full movement patterns with
