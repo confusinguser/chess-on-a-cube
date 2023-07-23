@@ -41,6 +41,7 @@ pub(crate) fn rotate(
                     CartesianDirection::$axis,
                     rotation_data.current_rotation,
                     rotation_data.camera_rotated_times,
+                    rotation_data.current_camera_up,
                 )
                 .expect("Current rotation does not have anything other than quarter turns")
                 .as_vec3()
@@ -51,22 +52,27 @@ pub(crate) fn rotate(
                     && (rotation_data.time_started_rotations[3].is_zero() || $camera_rotation == 0)
                 {
                     rotation_data.reversed_axes[axis_num] = axis[axis_num] < 0.;
-                    // rotation_data.time_started_rotations[axis_num] = time.elapsed();
-                    if $camera_rotation != 0 {
-                        rotation_data.time_started_rotations[3] = time.elapsed();
-                        rotation_data.reversed_axes[3] = $camera_rotation == -1;
-                        rotation_data.camera_rotated_times += $camera_rotation;
-                    }
+                    rotation_data.time_started_rotations[axis_num] = time.elapsed();
+                    // if $camera_rotation != 0 {
+                    //     rotation_data.time_started_rotations[3] = time.elapsed();
+                    //     rotation_data.reversed_axes[3] = $camera_rotation == -1;
+                    //     rotation_data.camera_rotated_times += $camera_rotation;
+                    // }
                 }
             };
         };
     }
 
     // Input
-    input_handling!(Left, NegY, 0);
-    input_handling!(Right, Y, 0);
-    input_handling!(Down, Z, 1);
-    input_handling!(Up, NegZ, -1);
+    input_handling!(Left, Y, 0);
+    input_handling!(Right, NegY, 0);
+    input_handling!(Down, NegZ, 1);
+    input_handling!(Up, Z, -1);
+    if input.just_pressed(KeyCode::Space) {
+        rotation_data.time_started_rotations[3] = time.elapsed();
+        rotation_data.reversed_axes[3] = input.pressed(KeyCode::A);
+        rotation_data.camera_rotated_times += if input.pressed(KeyCode::A) { -1 } else { 1 };
+    }
 
     let mut rotation_needed = rotation_data.current_rotation;
     let mut camera_rotation_up_needed = rotation_data.current_camera_up.as_vec3();
@@ -124,7 +130,11 @@ pub(crate) fn rotate(
 
         camera.0 = transform;
     }
-    dbg!(camera_rotation_up_needed, rotation_data);
+    dbg!(
+        camera_rotation_up_needed,
+        &rotation_data,
+        rotation_data.current_rotation.mul_vec3(Vec3::splat(1.))
+    );
 }
 
 fn animate_camera_rotation(
@@ -197,13 +207,17 @@ fn direction_after_spatial_and_camera_rotation(
     normal: CartesianDirection,
     rot: Quat,
     camera_rotated_times: i32,
+    current_camera_up: CartesianDirection,
 ) -> Option<CartesianDirection> {
-    let axis_after_camera = match camera_rotated_times % 3 {
+    let mut axis_after_camera = match camera_rotated_times % 3 {
         0 => normal,
         1 | -2 => direction_after_spatial_and_camera_turn(normal, rot, false),
         2 | -1 => direction_after_spatial_and_camera_turn(normal, rot, true),
         _ => unreachable!(),
     };
+    if normal == CartesianDirection::Y {
+        axis_after_camera = current_camera_up;
+    }
     new_axis_on_side_after_rotation(axis_after_camera, rot)
 }
 
