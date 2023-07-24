@@ -8,9 +8,12 @@ pub(crate) fn next_move(board: &Board, units: &Units, team: Team, depth: u32) ->
 }
 
 fn next_move_internal(board: &mut Board, units: &mut Units, team: Team, depth: u32) -> GameMove {
-    eval_recursive(board, units, team, depth, f32::MIN, f32::MAX)
+    let mut num_a_b = (0, 0);
+    let out = eval_recursive(board, units, team, depth, f32::MIN, f32::MAX, &mut num_a_b)
         .1
-        .unwrap()
+        .unwrap();
+    dbg!(num_a_b);
+    out
 }
 
 fn eval_recursive(
@@ -20,6 +23,7 @@ fn eval_recursive(
     depth: u32,
     mut alpha: f32,
     mut beta: f32,
+    num_a_b: &mut (u32, u32),
 ) -> (f32, Option<GameMove>) {
     if depth == 0 {
         let eval = eval(board, units);
@@ -32,37 +36,67 @@ fn eval_recursive(
         f32::MAX
     };
     let mut best_move: Option<GameMove> = None;
-    for game_move in get_possible_moves(board, units, team) {
+    let mut possible_moves = get_possible_moves(board, units, team);
+    possible_moves = sort_moves(possible_moves, units);
+    for game_move in possible_moves {
         let (made_move, captured_unit) = make_move(game_move, units);
         if !made_move {
             continue;
         }
 
-        let (eval_next, _) = eval_recursive(board, units, team.opposite(), depth - 1, alpha, beta);
+        let (eval_next, _) = eval_recursive(
+            board,
+            units,
+            team.opposite(),
+            depth - 1,
+            alpha,
+            beta,
+            num_a_b,
+        );
+        unmake_move(game_move, units, captured_unit);
+
         if (team == Team::White && eval_next > eval) || (team == Team::Black && eval_next < eval) {
-            dbg!(best_move);
             eval = eval_next;
             best_move = Some(game_move);
         }
 
         if team == Team::White {
             if eval > beta {
+                let (_, ref mut b) = num_a_b;
+                *b += 1;
+
                 break;
             }
-            dbg!(eval);
             alpha = alpha.max(eval);
         } else {
             if eval < alpha {
-                println!("brk alph");
-                dbg!(beta, alpha, eval);
+                let (ref mut a, _) = num_a_b;
+                *a += 1;
                 break;
             }
             beta = beta.min(eval);
         }
-
-        unmake_move(game_move, units, captured_unit)
     }
     (eval, best_move)
+}
+
+fn sort_moves(possible_moves: Vec<GameMove>, units: &Units) -> Vec<GameMove> {
+    let mut output = Vec::new();
+    for possible_move in possible_moves.into_iter() {
+        let is_capture = units.is_unit_at(possible_move.to);
+        if is_capture {
+            output.push((possible_move, 1));
+            continue;
+        }
+
+        output.push((possible_move, 0));
+    }
+
+    output.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap()); // Sorts list so largest is first
+    output
+        .into_iter()
+        .map(|possible_move| possible_move.0)
+        .collect()
 }
 
 fn get_possible_moves(board: &Board, units: &Units, team: Team) -> Vec<GameMove> {
@@ -81,23 +115,22 @@ fn get_possible_moves(board: &Board, units: &Units, team: Team) -> Vec<GameMove>
     output
 }
 
-fn eval(board: &Board, units: &Units) -> f32 {
-    let mut white_material = 0;
-    let mut black_material = 0;
+fn eval(_board: &Board, units: &Units) -> f32 {
+    let mut white_material = 0.;
+    let mut black_material = 0.;
 
     for unit in units.all_units_iter() {
-        let material = 1;
         match unit.team {
             Team::Black => {
-                black_material += material;
+                black_material += unit.unit_type.material_value();
             }
             Team::White => {
-                white_material += material;
+                white_material += unit.unit_type.material_value();
             }
         }
     }
 
-    (white_material - black_material) as f32
+    white_material - black_material
 }
 
 fn make_move(game_move: GameMove, units: &mut Units) -> (bool, Option<Unit>) {

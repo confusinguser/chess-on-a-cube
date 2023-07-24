@@ -62,6 +62,17 @@ impl UnitType {
     pub(crate) fn can_capture_over_edge(&self) -> bool {
         matches!(self, Self::Knight)
     }
+
+    pub(crate) fn material_value(&self) -> f32 {
+        match self {
+            UnitType::Rook => 5.,
+            UnitType::Bishop => 3.5,
+            UnitType::King => 1000.,
+            UnitType::Pawn(_, _) => 1.,
+            UnitType::Knight => 3.,
+            UnitType::Queen => 9.,
+        }
+    }
 }
 
 #[derive(Debug, Default, Clone)]
