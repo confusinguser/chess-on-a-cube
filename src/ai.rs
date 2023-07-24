@@ -79,7 +79,7 @@ fn eval_recursive(
         let (eval_next, best_variation_returned) = eval_recursive(
             board,
             units,
-            team,
+            team.opposite(),
             depth - 1,
             -beta,
             -alpha,

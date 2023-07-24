@@ -74,6 +74,7 @@ impl UnitType {
         }
     }
 
+    #[allow(unused)]
     pub(crate) fn symbol(&self) -> char {
         match self {
             UnitType::Rook => '♖',

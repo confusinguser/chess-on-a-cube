@@ -213,6 +213,7 @@ impl CellCoordinates {
         out
     }
 
+    #[allow(unused)]
     pub(crate) fn display(&self) -> String {
         let mut output = match self.normal_direction().abs() {
             CartesianDirection::X => "x",
