@@ -73,6 +73,17 @@ impl UnitType {
             UnitType::Queen => 9.,
         }
     }
+
+    pub(crate) fn symbol(&self) -> char {
+        match self {
+            UnitType::Rook => '♖',
+            UnitType::Bishop => '♗',
+            UnitType::King => '♔',
+            UnitType::Pawn(_, _) => '♙',
+            UnitType::Knight => '♘',
+            UnitType::Queen => '♕',
+        }
+    }
 }
 
 #[derive(Debug, Default, Clone)]

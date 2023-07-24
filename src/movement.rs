@@ -5,10 +5,23 @@ use crate::cell::{Board, CellCoordinates};
 use crate::units::*;
 use crate::utils::{CartesianDirection, RadialDirection};
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub(crate) struct GameMove {
     pub(crate) from: CellCoordinates,
     pub(crate) to: CellCoordinates,
+}
+
+impl GameMove {
+    pub(crate) fn display_with_unit(&self, unit: Option<&Unit>) -> String {
+        let mut output = String::new();
+        if let Some(unit) = unit {
+            output.push(unit.unit_type.symbol());
+        }
+        output.push_str(&self.from.display());
+        output.push('-');
+        output.push_str(&self.to.display());
+        output
+    }
 }
 
 pub(crate) fn get_unit_moves(unit: &Unit, board: &Board, units: &Units) -> Vec<CellCoordinates> {

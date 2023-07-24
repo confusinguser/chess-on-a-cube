@@ -212,6 +212,34 @@ impl CellCoordinates {
         }
         out
     }
+
+    pub(crate) fn display(&self) -> String {
+        let mut output = match self.normal_direction().abs() {
+            CartesianDirection::X => "x",
+            CartesianDirection::Y => "y",
+            CartesianDirection::Z => "z",
+            _ => unreachable!(),
+        }
+        .to_string();
+        if self.normal_is_positive {
+            output = output.to_uppercase();
+        }
+
+        let mut second_axis = false;
+        const LETTERS: [char; 4] = ['a', 'b', 'c', 'd'];
+        for i in 0..3 {
+            if self[i] == 0 {
+                continue;
+            }
+            if second_axis {
+                output.push_str(&self[i].to_string());
+            } else {
+                output.push(LETTERS[self[i] as usize - 1]);
+            }
+            second_axis = true;
+        }
+        output
+    }
 }
 
 impl Index<usize> for CellCoordinates {

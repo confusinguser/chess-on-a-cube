@@ -1,3 +1,7 @@
+use std::thread;
+use std::time::Duration;
+
+use crate::ai::AICache;
 use crate::movement::GameMove;
 use crate::{ai, movement, units::*};
 
@@ -280,14 +284,18 @@ pub(crate) fn on_unit_clicked(
     Bubble::Burst
 }
 
-pub(crate) fn ai_play(mut game: ResMut<Game>, mut commands: Commands) {
+pub(crate) fn ai_play(
+    mut game: ResMut<Game>,
+    mut commands: Commands,
+    mut ai_cache: Local<AICache>,
+) {
     if game
         .ai_playing
         .map_or(false, |ai_playing| ai_playing == game.turn)
     {
         // It is AI's turn
-        let next_move = ai::next_move(&game.board, &game.units, game.turn, 8);
+        thread::sleep(Duration::from_millis(300));
+        let next_move = ai::next_move(&game.board, &game.units, game.turn, 3, &mut ai_cache);
         make_move(next_move, &mut game, &mut commands);
-        game.next_player_turn();
     }
 }

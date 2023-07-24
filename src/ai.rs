@@ -3,19 +3,51 @@ use crate::movement::*;
 use crate::units::*;
 use crate::{cell::*, movement};
 
-pub(crate) fn next_move(board: &Board, units: &Units, team: Team, depth: u32) -> GameMove {
-    next_move_internal(&mut board.clone(), &mut units.clone(), team, depth)
+#[derive(Default)]
+pub(crate) struct AICache {
+    last_variation: Vec<GameMove>,
 }
 
-fn next_move_internal(board: &mut Board, units: &mut Units, team: Team, depth: u32) -> GameMove {
+pub(crate) fn next_move(
+    board: &Board,
+    units: &Units,
+    team: Team,
+    depth: u32,
+    ai_cache: &mut AICache,
+) -> GameMove {
+    next_move_internal(
+        &mut board.clone(),
+        &mut units.clone(),
+        team,
+        depth,
+        ai_cache,
+    )
+}
+
+fn next_move_internal(
+    board: &mut Board,
+    units: &mut Units,
+    team: Team,
+    depth: u32,
+    ai_cache: &mut AICache,
+) -> GameMove {
     let mut stats = (0, 0, 0);
-    let out = eval_recursive(board, units, team, depth, f32::MIN, f32::MAX, &mut stats)
-        .1
-        .unwrap();
-    dbg!(stats);
-    out
+    let mut variation = eval_recursive(
+        board,
+        units,
+        team,
+        depth,
+        f32::MIN,
+        f32::MAX,
+        &mut stats,
+        true,
+        ai_cache,
+    );
+
+    variation.1.pop().unwrap()
 }
 
+#[allow(clippy::too_many_arguments)]
 fn eval_recursive(
     board: &mut Board,
     units: &mut Units,
@@ -24,38 +56,46 @@ fn eval_recursive(
     mut alpha: f32,
     beta: f32,
     stats: &mut (u32, u32, u32),
-) -> (f32, Option<GameMove>) {
+    og: bool,
+    ai_cache: &mut AICache,
+) -> (f32, Vec<GameMove>) {
     let (_, _, ref mut num_nodes) = stats;
     *num_nodes += 1;
     if depth == 0 {
-        let eval = eval(board, units) * team.sign() as f32;
-        return (eval, None);
+        let eval = evaluation(board, units, ai_cache) * team.sign() as f32;
+        return (eval, Vec::new());
     }
 
     let mut eval = f32::MIN;
-    let mut best_move: Option<GameMove> = None;
-    let mut possible_moves = get_possible_moves(board, units, team);
-    possible_moves = sort_moves(possible_moves, units);
+    let mut best_variation: Vec<GameMove> = Vec::new();
+    let possible_moves = get_possible_moves(board, units, team);
+    let possible_moves = sort_moves(possible_moves, board, units, team, ai_cache);
     for game_move in possible_moves {
-        let (made_move, captured_unit) = make_move(game_move, units);
+        let (made_move, captured_unit) = make_move(game_move.0, units);
         if !made_move {
             continue;
         }
 
-        let (eval_next, _) = eval_recursive(
+        let (eval_next, best_variation_returned) = eval_recursive(
             board,
             units,
-            team.opposite(),
+            team,
             depth - 1,
             -beta,
             -alpha,
             stats,
+            false,
+            ai_cache,
         );
-        unmake_move(game_move, units, captured_unit);
+        unmake_move(game_move.0, units, captured_unit);
 
-        if -eval_next >= eval {
+        if eval_next > eval {
             eval = eval_next;
-            best_move = Some(game_move);
+            best_variation = best_variation_returned.clone();
+            if og {
+                ai_cache.last_variation = best_variation_returned;
+            }
+            best_variation.push(game_move.0);
         }
 
         alpha = alpha.max(eval);
@@ -67,29 +107,54 @@ fn eval_recursive(
                 *b += 1;
             }
 
-            break;
+            // break;
         }
     }
-    (eval, best_move)
+    (eval, best_variation)
 }
 
-fn sort_moves(possible_moves: Vec<GameMove>, units: &Units) -> Vec<GameMove> {
+fn sort_moves(
+    possible_moves: Vec<GameMove>,
+    board: &Board,
+    units: &mut Units,
+    team: Team,
+    ai_cache: &mut AICache,
+) -> Vec<(GameMove, i32, f32)> {
     let mut output = Vec::new();
     for possible_move in possible_moves.into_iter() {
-        let is_capture = units.is_unit_at(possible_move.to);
-        if is_capture {
-            output.push((possible_move, 1));
+        let (move_made, captured_unit) = make_move(possible_move, units);
+        if !move_made {
             continue;
         }
 
-        output.push((possible_move, 0));
+        let eval = evaluation(board, units, ai_cache) * team.sign() as f32;
+        unmake_move(possible_move, units, captured_unit);
+
+        if ai_cache
+            .last_variation
+            .last()
+            .map_or(false, |&game_move| game_move == possible_move)
+        {
+            output.push((possible_move, 2, eval));
+            continue;
+        }
+
+        let is_capture = units.is_unit_at(possible_move.to);
+        if is_capture {
+            output.push((possible_move, 1, eval));
+            continue;
+        }
+
+        output.push((possible_move, 0, eval));
     }
 
+    output.sort_by(|a, b| b.2.partial_cmp(&a.2).unwrap());
     output.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap()); // Sorts list so largest is first
+                                                           // output
+                                                           //     .into_iter()
+                                                           //     .map(|possible_move| possible_move.0)
+                                                           //     .collect()
     output
-        .into_iter()
-        .map(|possible_move| possible_move.0)
-        .collect()
 }
 
 fn get_possible_moves(board: &Board, units: &Units, team: Team) -> Vec<GameMove> {
@@ -108,7 +173,7 @@ fn get_possible_moves(board: &Board, units: &Units, team: Team) -> Vec<GameMove>
     output
 }
 
-fn eval(_board: &Board, units: &Units) -> f32 {
+fn evaluation(_board: &Board, units: &Units, _ai_cache: &mut AICache) -> f32 {
     let mut white_material = 0.;
     let mut black_material = 0.;
 
