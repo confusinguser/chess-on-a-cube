@@ -8,11 +8,11 @@ pub(crate) fn next_move(board: &Board, units: &Units, team: Team, depth: u32) ->
 }
 
 fn next_move_internal(board: &mut Board, units: &mut Units, team: Team, depth: u32) -> GameMove {
-    let mut num_a_b = (0, 0);
-    let out = eval_recursive(board, units, team, depth, f32::MIN, f32::MAX, &mut num_a_b)
+    let mut stats = (0, 0, 0);
+    let out = eval_recursive(board, units, team, depth, f32::MIN, f32::MAX, &mut stats)
         .1
         .unwrap();
-    dbg!(num_a_b);
+    dbg!(stats);
     out
 }
 
@@ -22,19 +22,17 @@ fn eval_recursive(
     team: Team,
     depth: u32,
     mut alpha: f32,
-    mut beta: f32,
-    num_a_b: &mut (u32, u32),
+    beta: f32,
+    stats: &mut (u32, u32, u32),
 ) -> (f32, Option<GameMove>) {
+    let (_, _, ref mut num_nodes) = stats;
+    *num_nodes += 1;
     if depth == 0 {
-        let eval = eval(board, units);
+        let eval = eval(board, units) * team.sign() as f32;
         return (eval, None);
     }
 
-    let mut eval = if team == Team::White {
-        f32::MIN
-    } else {
-        f32::MAX
-    };
+    let mut eval = f32::MIN;
     let mut best_move: Option<GameMove> = None;
     let mut possible_moves = get_possible_moves(board, units, team);
     possible_moves = sort_moves(possible_moves, units);
@@ -49,32 +47,27 @@ fn eval_recursive(
             units,
             team.opposite(),
             depth - 1,
-            alpha,
-            beta,
-            num_a_b,
+            -beta,
+            -alpha,
+            stats,
         );
         unmake_move(game_move, units, captured_unit);
 
-        if (team == Team::White && eval_next > eval) || (team == Team::Black && eval_next < eval) {
+        if -eval_next >= eval {
             eval = eval_next;
             best_move = Some(game_move);
         }
 
-        if team == Team::White {
-            if eval > beta {
-                let (_, ref mut b) = num_a_b;
-                *b += 1;
-
-                break;
-            }
-            alpha = alpha.max(eval);
-        } else {
-            if eval < alpha {
-                let (ref mut a, _) = num_a_b;
+        alpha = alpha.max(eval);
+        if alpha >= beta {
+            let (ref mut a, ref mut b, _) = stats;
+            if team == Team::Black {
                 *a += 1;
-                break;
+            } else {
+                *b += 1;
             }
-            beta = beta.min(eval);
+
+            break;
         }
     }
     (eval, best_move)

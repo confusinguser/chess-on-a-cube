@@ -81,6 +81,13 @@ impl Team {
             Team::White => Team::Black,
         }
     }
+
+    pub(crate) fn sign(&self) -> i32 {
+        match self {
+            Team::Black => -1,
+            Team::White => 1,
+        }
+    }
 }
 
 #[derive(PartialEq, Debug)]
@@ -279,7 +286,7 @@ pub(crate) fn ai_play(mut game: ResMut<Game>, mut commands: Commands) {
         .map_or(false, |ai_playing| ai_playing == game.turn)
     {
         // It is AI's turn
-        let next_move = ai::next_move(&game.board, &game.units, game.turn, 6);
+        let next_move = ai::next_move(&game.board, &game.units, game.turn, 8);
         make_move(next_move, &mut game, &mut commands);
         game.next_player_turn();
     }
