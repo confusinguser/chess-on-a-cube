@@ -10,7 +10,6 @@ pub(crate) struct RotationData {
     current_camera_up: CartesianDirection,
     time_started_rotations: [Duration; 4],
     reversed_axes: [bool; 4],
-    camera_rotated_times: i32,
 }
 
 impl Default for RotationData {
@@ -20,7 +19,6 @@ impl Default for RotationData {
             current_camera_up: CartesianDirection::Y,
             time_started_rotations: Default::default(),
             reversed_axes: Default::default(),
-            camera_rotated_times: Default::default(),
         }
     }
 }
@@ -34,44 +32,38 @@ pub(crate) fn rotate(
     let time = &*time;
     let rotation_data = &mut *rotation_data;
     let rotation_duration = 1.;
-    macro_rules! input_handling {
-        ($keycode:tt, $axis:tt, $camera_rotation: expr) => {
-            if input.just_pressed(KeyCode::$keycode) {
-                let axis = direction_after_spatial_and_camera_rotation(
-                    CartesianDirection::$axis,
-                    rotation_data.current_rotation,
-                    rotation_data.camera_rotated_times,
-                    rotation_data.current_camera_up,
-                )
-                .expect("Current rotation does not have anything other than quarter turns")
-                .as_vec3()
-                    * PI
-                    / 2.;
-                let axis_num = utils::first_nonzero_component(axis).unwrap() as usize;
-                if rotation_data.time_started_rotations[axis_num].is_zero()
-                    && (rotation_data.time_started_rotations[3].is_zero() || $camera_rotation == 0)
-                {
-                    rotation_data.reversed_axes[axis_num] = axis[axis_num] < 0.;
-                    rotation_data.time_started_rotations[axis_num] = time.elapsed();
-                    // if $camera_rotation != 0 {
-                    //     rotation_data.time_started_rotations[3] = time.elapsed();
-                    //     rotation_data.reversed_axes[3] = $camera_rotation == -1;
-                    //     rotation_data.camera_rotated_times += $camera_rotation;
-                    // }
-                }
-            };
+    let mut input_handling = |keycode: KeyCode, axis: CartesianDirection, camera_rotation: i32| {
+        if input.just_pressed(keycode) {
+            let axis = direction_after_camera_turn(
+                axis.abs(),
+                rotation_data.current_rotation,
+                rotation_data.current_camera_up,
+                0,
+            )
+            .expect("Current rotation does not have anything other than quarter turns");
+            let axis_num = axis.axis_num() as usize;
+            if rotation_data.time_started_rotations[axis_num].is_zero()
+                && (rotation_data.time_started_rotations[3].is_zero() || camera_rotation == 0)
+            {
+                rotation_data.reversed_axes[axis_num] = axis.is_negative();
+                rotation_data.time_started_rotations[axis_num] = time.elapsed();
+                // if $camera_rotation != 0 {
+                //     rotation_data.time_started_rotations[3] = time.elapsed();
+                //     rotation_data.reversed_axes[3] = $camera_rotation == -1;
+                //     rotation_data.camera_rotated_times += $camera_rotation;
+                // }
+            }
         };
-    }
+    };
 
     // Input
-    input_handling!(Left, Y, 0);
-    input_handling!(Right, NegY, 0);
-    input_handling!(Down, NegZ, 1);
-    input_handling!(Up, Z, -1);
+    input_handling(KeyCode::Left, CartesianDirection::Y, 0);
+    input_handling(KeyCode::Right, CartesianDirection::NegY, 0);
+    input_handling(KeyCode::Down, CartesianDirection::NegZ, 1);
+    input_handling(KeyCode::Up, CartesianDirection::Z, -1);
     if input.just_pressed(KeyCode::Space) {
         rotation_data.time_started_rotations[3] = time.elapsed();
         rotation_data.reversed_axes[3] = input.pressed(KeyCode::A);
-        rotation_data.camera_rotated_times += if input.pressed(KeyCode::A) { -1 } else { 1 };
     }
 
     let mut rotation_needed = rotation_data.current_rotation;
@@ -145,15 +137,19 @@ fn animate_camera_rotation(
         return; // No rotation happening on axis
     }
     let time_elapsed = time.elapsed() - time_started_rotation.to_owned();
-    // Cancel out rotation because direction_after_spatial_and_camera_turn rotates it again, TODO
-    let target = direction_after_spatial_and_camera_turn(
-        CartesianDirection::from_vec3_round(
-            rotation.inverse().mul_vec3(current_camera_up.as_vec3()),
-        )
-        .unwrap(),
-        rotation,
-        reversed,
+    let cancelled_out_camera_up = CartesianDirection::from_vec3_round(
+        rotation.inverse().mul_vec3(current_camera_up.as_vec3()),
     );
+
+    // Two clockwise => counterclockwise
+    let target = direction_after_camera_turn(
+        cancelled_out_camera_up.unwrap(),
+        rotation,
+        *current_camera_up,
+        if reversed { 2 } else { 1 },
+    )
+    .unwrap();
+    let target = direction_after_rotation(target, rotation).unwrap();
 
     let quat_path = Quat::from_rotation_arc(current_camera_up.as_vec3(), target.as_vec3());
     let rotation_amount = rotation_curve(time_elapsed.as_secs_f32() / rotation_duration)
@@ -167,53 +163,73 @@ fn animate_camera_rotation(
     }
 }
 
-/// Takes the normal and gives back a new normal where the cube is both rotated and the camera
-/// turned a third of a turn either clockwise or counterclockwise
-fn direction_after_spatial_and_camera_turn(
-    normal: CartesianDirection,
+/// Note: The normal inputted has to be UNROTATED
+fn direction_after_camera_turn(
+    mut normal: CartesianDirection,
     rot: Quat,
-    counterclockwise: bool,
-) -> CartesianDirection {
+    current_camera_up: CartesianDirection,
+    clockwise_turns: u32,
+) -> Option<CartesianDirection> {
     use CartesianDirection::*;
-    let mut only_camera = match normal.abs() {
-        X => Y,
-        Y => Z,
-        Z => X,
-        _ => unreachable!(),
-    };
-    if counterclockwise {
-        // Two clockwise => one counterclockwise
-        only_camera = match only_camera {
+    for _ in 0..clockwise_turns {
+        normal = match normal.abs() {
             X => Y,
             Y => Z,
             Z => X,
             _ => unreachable!(),
-        };
+        }
     }
-    if only_camera.is_negative() {
-        only_camera = only_camera.opposite();
+    match normal {
+        CartesianDirection::Y => Some(current_camera_up),
+        CartesianDirection::Z => to_the_side_from_camera_perspective(
+            rot.mul_vec3(Vec3::splat(1.)),
+            current_camera_up,
+            false,
+        ),
+        CartesianDirection::X => to_the_side_from_camera_perspective(
+            rot.mul_vec3(Vec3::splat(1.)),
+            current_camera_up,
+            true,
+        ),
+        _ => {
+            // TODO: Reset everything instead
+            error!("The normal is not visible from current position");
+            dbg!(current_camera_up, normal);
+            None
+        }
     }
-    // Later, make a reset func to recover from errors, TODO
-    new_axis_on_side_after_rotation(only_camera, rot).unwrap()
 }
 
-/// TODO: Come up with better names dude
-fn direction_after_spatial_and_camera_rotation(
-    normal: CartesianDirection,
-    rot: Quat,
-    camera_rotated_times: i32,
+/// From the camera perspective, gets the leftmost or rightmost side normal.
+/// current_camera_up has to be visible from the camera loc
+fn to_the_side_from_camera_perspective(
+    camera_loc: Vec3,
     current_camera_up: CartesianDirection,
+    to_the_right: bool,
 ) -> Option<CartesianDirection> {
-    let mut axis_after_camera = match camera_rotated_times % 3 {
-        0 => normal,
-        1 | -2 => direction_after_spatial_and_camera_turn(normal, rot, false),
-        2 | -1 => direction_after_spatial_and_camera_turn(normal, rot, true),
-        _ => unreachable!(),
-    };
-    if normal == CartesianDirection::Y {
-        axis_after_camera = current_camera_up;
+    let sides = order_of_sides(current_camera_up);
+    let mut side_indicies = Vec::with_capacity(2);
+    for i in 0..3 {
+        let c = camera_loc[i];
+        let mut side = Vec3::ZERO;
+        side[i] = c;
+        let axis = CartesianDirection::from_vec3_round(side).unwrap();
+        if current_camera_up.axis_num() == i as u32 {
+            if current_camera_up != axis {
+                // The side camera up is not visible
+                return None;
+            }
+            continue;
+        }
+        side_indicies.push((axis, sides.iter().position(|&side| side == axis).unwrap()));
     }
-    new_axis_on_side_after_rotation(axis_after_camera, rot)
+    assert_eq!(side_indicies.len(), 2);
+    side_indicies.sort_by_key(|side_index| side_index.1);
+
+    if side_indicies[0].1 == 0 && side_indicies[1].1 == 3 {
+        return Some(side_indicies[if to_the_right { 0 } else { 1 }].0);
+    }
+    Some(side_indicies[if to_the_right { 1 } else { 0 }].0)
 }
 
 fn rotation_curve(time: f32) -> f32 {
@@ -252,6 +268,22 @@ fn new_axis_on_side_after_rotation(
     unreachable!()
 }
 
+/// Outputs the order that the sides on the side come in when the inputted side is on the top. In
+/// clockwise order when looking at it from the bottom up.
+fn order_of_sides(up: CartesianDirection) -> [CartesianDirection; 4] {
+    use CartesianDirection::*;
+    let mut output = match up.abs() {
+        X => [Y, Z, NegY, NegZ],
+        Y => [Z, X, NegZ, NegX],
+        Z => [X, Y, NegX, NegY],
+        _ => unreachable!(),
+    };
+
+    if up.is_negative() {
+        output.reverse();
+    }
+    output
+}
 /// # Arguments
 /// axis: The first axis in the EulerRot should correspond to the axis animated
 fn animate_axis(
@@ -281,6 +313,10 @@ fn animate_axis(
     }
 }
 
+fn reset_everything() {
+    todo!()
+}
+
 mod tests {
     #[test]
     fn new_axis_on_side_after_rotation_test() {
@@ -295,27 +331,6 @@ mod tests {
                 )
                 .unwrap();
                 assert_eq!(o, direction2, "From: {:?}, to: {:?}", direction2, direction)
-            }
-        }
-    }
-
-    #[test]
-    fn direction_after_spatial_and_camera_turn_test() {
-        for to in crate::utils::CartesianDirection::directions() {
-            for from in crate::utils::CartesianDirection::directions() {
-                let rot = bevy::prelude::Quat::from_rotation_arc(from.as_vec3(), to.as_vec3());
-
-                let o = crate::cube_rotation::direction_after_spatial_and_camera_turn(
-                    crate::utils::CartesianDirection::Y,
-                    rot,
-                    true,
-                );
-
-                let camera_loc = rot.inverse().mul_vec3(bevy::prelude::Vec3::splat(1.));
-
-                if (camera_loc[o.axis_num() as usize] < 0.) != o.is_negative() {
-                    panic!("The side given back by function is not currently visible");
-                }
             }
         }
     }
