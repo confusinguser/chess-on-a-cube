@@ -32,35 +32,41 @@ pub(crate) fn rotate(
     let time = &*time;
     let rotation_data = &mut *rotation_data;
     let rotation_duration = 1.;
-    let mut input_handling = |keycode: KeyCode, axis: CartesianDirection, camera_rotation: i32| {
-        if input.just_pressed(keycode) {
-            let axis = direction_after_camera_turn(
-                axis.abs(),
-                rotation_data.current_rotation,
-                rotation_data.current_camera_up,
-                0,
-            )
-            .expect("Current rotation does not have anything other than quarter turns");
-            let axis_num = axis.axis_num() as usize;
-            if rotation_data.time_started_rotations[axis_num].is_zero()
-                && (rotation_data.time_started_rotations[3].is_zero() || camera_rotation == 0)
-            {
-                rotation_data.reversed_axes[axis_num] = axis.is_negative();
-                rotation_data.time_started_rotations[axis_num] = time.elapsed();
-                // if $camera_rotation != 0 {
-                //     rotation_data.time_started_rotations[3] = time.elapsed();
-                //     rotation_data.reversed_axes[3] = $camera_rotation == -1;
-                //     rotation_data.camera_rotated_times += $camera_rotation;
-                // }
-            }
+
+    dbg!(
+        &rotation_data,
+        rotation_data.current_rotation.mul_vec3(Vec3::splat(1.))
+    );
+
+    let mut input_handling =
+        |keycode: KeyCode, axis: CartesianDirection, camera_rotation: i32, reversed: bool| {
+            if input.just_pressed(keycode) {
+                let axis_rotated = direction_after_camera_turn(
+                    axis.abs(),
+                    rotation_data.current_rotation,
+                    rotation_data.current_camera_up,
+                    0,
+                )
+                .expect("Current rotation does not have anything other than quarter turns");
+                let axis_num = axis_rotated.axis_num() as usize;
+                if rotation_data.time_started_rotations[axis_num].is_zero()
+                    && (rotation_data.time_started_rotations[3].is_zero() || camera_rotation == 0)
+                {
+                    rotation_data.reversed_axes[axis_num] = reversed;
+                    rotation_data.time_started_rotations[axis_num] = time.elapsed();
+                    if camera_rotation != 0 {
+                        rotation_data.time_started_rotations[3] = time.elapsed();
+                        rotation_data.reversed_axes[3] = camera_rotation == -1;
+                    }
+                }
+            };
         };
-    };
 
     // Input
-    input_handling(KeyCode::Left, CartesianDirection::Y, 0);
-    input_handling(KeyCode::Right, CartesianDirection::NegY, 0);
-    input_handling(KeyCode::Down, CartesianDirection::NegZ, 1);
-    input_handling(KeyCode::Up, CartesianDirection::Z, -1);
+    input_handling(KeyCode::Left, CartesianDirection::Y, 0, true);
+    input_handling(KeyCode::Right, CartesianDirection::Y, 0, false);
+    input_handling(KeyCode::Down, CartesianDirection::Z, 1, false);
+    input_handling(KeyCode::Up, CartesianDirection::Z, -1, true);
     if input.just_pressed(KeyCode::Space) {
         rotation_data.time_started_rotations[3] = time.elapsed();
         rotation_data.reversed_axes[3] = input.pressed(KeyCode::A);
@@ -68,6 +74,17 @@ pub(crate) fn rotate(
 
     let mut rotation_needed = rotation_data.current_rotation;
     let mut camera_rotation_up_needed = rotation_data.current_camera_up.as_vec3();
+    // Has to happen before world axes so that the rotation is the same on even the last one
+    animate_camera_rotation(
+        time,
+        &mut rotation_data.time_started_rotations[3],
+        &mut rotation_data.current_camera_up,
+        rotation_duration,
+        &mut camera_rotation_up_needed,
+        rotation_data.reversed_axes[3],
+        rotation_data.current_rotation,
+    );
+
     // Animate world axes
     // x-axis
     animate_axis(
@@ -100,23 +117,14 @@ pub(crate) fn rotate(
         rotation_data.reversed_axes[2],
     );
 
-    animate_camera_rotation(
-        time,
-        &mut rotation_data.time_started_rotations[3],
-        &mut rotation_data.current_camera_up,
-        rotation_duration,
-        &mut camera_rotation_up_needed,
-        rotation_data.reversed_axes[3],
-        rotation_data.current_rotation,
-    );
-
+    dbg!(rotation_needed.mul_vec3(Vec3::splat(1.)));
     // Apply the rotation
     for mut camera in &mut query {
         let mut transform = camera.0;
         transform.translation = camera.1.start_coords;
         // The camera rotates in the opposite direction from how the cube would have rotated to get
         // to the same place
-        transform.translate_around(Vec3::new(0., 0., 0.), rotation_needed.inverse());
+        transform.translate_around(Vec3::new(0., 0., 0.), rotation_needed);
 
         transform.look_at(Vec3::new(0., 0., 0.), camera_rotation_up_needed);
 
@@ -149,7 +157,8 @@ fn animate_camera_rotation(
         if reversed { 2 } else { 1 },
     )
     .unwrap();
-    let target = direction_after_rotation(target, rotation).unwrap();
+    dbg!(target);
+    // let target = direction_after_rotation(target, rotation).unwrap();
 
     let quat_path = Quat::from_rotation_arc(current_camera_up.as_vec3(), target.as_vec3());
     let rotation_amount = rotation_curve(time_elapsed.as_secs_f32() / rotation_duration)
@@ -216,7 +225,8 @@ fn to_the_side_from_camera_perspective(
         let axis = CartesianDirection::from_vec3_round(side).unwrap();
         if current_camera_up.axis_num() == i as u32 {
             if current_camera_up != axis {
-                // The side camera up is not visible
+                error!("The side camera up is not visible");
+                dbg!(camera_loc, axis);
                 return None;
             }
             continue;
@@ -239,11 +249,12 @@ fn rotation_curve(time: f32) -> f32 {
     if time <= 0. {
         return 0.;
     }
+    time
 
-    let c1 = 1.70158;
-    let c3 = c1 + 1.;
+    // let c1 = 1.70158;
+    // let c3 = c1 + 1.;
 
-    1. + c3 * (time - 1.).powi(3) + c1 * (time - 1.).powi(2)
+    // 1. + c3 * (time - 1.).powi(3) + c1 * (time - 1.).powi(2)
 }
 
 fn direction_after_rotation(
@@ -311,10 +322,6 @@ fn animate_axis(
         *current_rotation *=
             Quat::from_euler(axis, if reversed { -1. } else { 1. } * PI / 2., 0., 0.);
     }
-}
-
-fn reset_everything() {
-    todo!()
 }
 
 mod tests {
