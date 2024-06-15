@@ -227,22 +227,14 @@ impl CartesianDirection {
         }
     }
 
-    /// Returns the positive direction whose axis that is perpendicular to the two others. Returns
-    /// None if the two directions are on the same axis
-    pub(crate) fn get_perpendicular_axis(
-        &self,
-        other: CartesianDirection,
-    ) -> Option<CartesianDirection> {
+    /// Takes the cross product of the directions. Returns None if the two directions are on the same axis
+    pub(crate) fn cross(&self, other: CartesianDirection) -> Option<CartesianDirection> {
         if self.abs() == other.abs() {
-            // Both are on same axis, so there are two perpendiculars
+            // Both are on same axis
             return None;
         }
-        for axis_num in 0..3 {
-            if self.axis_num() != axis_num && other.axis_num() != axis_num {
-                return Some(CartesianDirection::from_axis_num(axis_num, true));
-            }
-        }
-        None
+
+        Self::from_vec3_round(self.as_vec3().cross(other.as_vec3()))
     }
 
     pub(crate) fn directions() -> [CartesianDirection; 6] {
