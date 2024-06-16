@@ -206,7 +206,7 @@ impl CartesianDirection {
             Self::Z | Self::NegZ => Self::Z,
         }
     }
-    
+
     pub(crate) fn is_parallel_to(&self, other: CartesianDirection) -> bool {
         self.abs() == other.abs()
     }
@@ -271,4 +271,15 @@ impl CartesianDirection {
         }
         out
     }
+}
+
+/// Signifies the direction seen from the camera.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub(crate) enum SeeDirection {
+    Top,
+    Left,
+    Right,
+    Bottom,
+    BackLeft,
+    BackRight,
 }

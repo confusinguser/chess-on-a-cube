@@ -1,19 +1,19 @@
-use std::cmp::Ordering;
+use std::collections::VecDeque;
 use std::time::{Duration, Instant};
 
 use bevy::prelude::*;
 use derivative::Derivative;
 
 use crate::MainCamera;
-use crate::utils::CartesianDirection;
+use crate::utils::{CartesianDirection, SeeDirection};
 
-#[derive(Debug, Default, Clone, Copy)]
+#[derive(Debug, Default, Clone)]
 pub(crate) struct RotationData {
     rotation_state: RotationState,
-    future_rotation_state: RotationState,
     /// The rotation state that is currently targeted by the ongoing animation(s). An animation around the side face only sets the top to `Some`, and vice versa. This is to allow simultaneous animations of the side and the top, without interference once one of them reaches the goal.
-    top_rotation_animation: Option<RotationAnimationData>,
-    side_rotation_animation: Option<RotationAnimationData>,
+    future_rotation_state: RotationState,
+    /// List of ongoing animations, oldest animation is first
+    animations: VecDeque<RotationAnimationData>,
 }
 
 #[derive(Debug, Derivative, Clone, Copy, PartialEq, Eq)]
@@ -48,6 +48,34 @@ impl RotationState {
         }
         rotation_state
     }
+
+    /// Set the rotation state field from the see direction
+    fn set_see_direction(&mut self, see_direction: SeeDirection, value: CartesianDirection) {
+        match see_direction {
+            SeeDirection::Top => self.top = value,
+            SeeDirection::Left => self.side = value,
+            _ => {}
+        }
+    }
+
+    /// Panics in some cases if the rotation state is not possible. That is, if the side and top are parallel
+    fn get_see_direction(&self, see_direction: SeeDirection) -> CartesianDirection {
+        match see_direction {
+            SeeDirection::Top => self.top,
+            SeeDirection::Left => self.side,
+            SeeDirection::Right => self
+                .top
+                .cross(self.side)
+                .expect("Rotation state is not possible"),
+            SeeDirection::BackLeft => self
+                .top
+                .cross(self.side)
+                .expect("Rotation state is not possible")
+                .opposite(),
+            SeeDirection::Bottom => self.top.opposite(),
+            SeeDirection::BackRight => self.side.opposite(),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -55,6 +83,8 @@ pub(crate) struct RotationAnimationData {
     from: CartesianDirection,
     target: CartesianDirection,
     animation_started: Instant,
+    /// What side seen from the camera that from and target are referring to
+    side_changing: SeeDirection,
 }
 
 impl RotationAnimationData {
@@ -97,26 +127,9 @@ pub(crate) fn iterate(
         let mut transform = camera.0;
         transform.translation = rotation_data.rotation_state.camera_location() * 2.;
 
-        // Needed to prevent dropping this value
-        let animations = [
-            rotation_data.top_rotation_animation,
-            rotation_data.side_rotation_animation,
-        ];
-        let mut animations = animations
-            .iter()
-            .flatten()
-            .collect::<Vec<&RotationAnimationData>>();
-        // Sort by when the animation started. If this is not done, the animations may be added in the wrong order resulting in wrong rotation
-        animations.sort_by(|c1, c2| {
-            if c1.animation_started < c2.animation_started {
-                Ordering::Greater
-            } else {
-                Ordering::Less
-            }
-        });
         transform.translate_around(
             Vec3::ZERO,
-            total_animation_rotation(&animations, rotation_duration),
+            total_animation_rotation(&rotation_data.animations, rotation_duration),
         );
 
         transform.look_at(
@@ -129,60 +142,48 @@ pub(crate) fn iterate(
 }
 
 fn conclude_finished_animations(rotation_data: &mut RotationData, rotation_duration: Duration) {
-    if let Some(animation) = &rotation_data.side_rotation_animation {
+    let mut num_finished_animations = 0;
+    for animation in &rotation_data.animations {
         if (Instant::now() - animation.animation_started) > rotation_duration {
-            rotation_data.rotation_state.top = animation.target;
-            rotation_data.side_rotation_animation = None;
+            rotation_data
+                .rotation_state
+                .set_see_direction(animation.side_changing, animation.target);
+            num_finished_animations += 1;
         }
     }
 
-    if let Some(animation) = &rotation_data.top_rotation_animation {
-        if (Instant::now() - animation.animation_started) > rotation_duration {
-            rotation_data.rotation_state.side = animation.target;
-            rotation_data.top_rotation_animation = None;
-        }
+    for _ in 0..num_finished_animations {
+        rotation_data.animations.pop_front();
     }
 }
 
 fn input_handling(input: Res<Input<KeyCode>>, rotation_data: &mut RotationData) {
-    if rotation_data.top_rotation_animation.is_none() {
-        let rotation = if input.just_pressed(KeyCode::Right) {
-            Some(rotation_data.future_rotation_state.top.opposite())
-        } else if input.just_pressed(KeyCode::Left) {
-            Some(rotation_data.future_rotation_state.top)
-        } else {
-            None
-        };
-        if let Some(rotation) = rotation {
-            start_rotation(rotation_data, rotation);
-        }
+    let fs = rotation_data.future_rotation_state; // Shorthand
+    if input.just_pressed(KeyCode::Right) {
+        start_rotation(rotation_data, fs.top.opposite(), SeeDirection::Top);
+    } else if input.just_pressed(KeyCode::Left) {
+        start_rotation(rotation_data, fs.top, SeeDirection::Top);
     }
-
-    if rotation_data.side_rotation_animation.is_none() {
-        let rotation = if input.just_pressed(KeyCode::Up) {
-            Some(rotation_data.future_rotation_state.side.opposite())
-        } else if input.just_pressed(KeyCode::Down) {
-            Some(rotation_data.future_rotation_state.side)
-        } else {
-            None
-        };
-        if let Some(rotation) = rotation {
-            start_rotation(rotation_data, rotation);
-        }
+    if input.just_pressed(KeyCode::Up) {
+        start_rotation(rotation_data, fs.side.opposite(), SeeDirection::Left);
+    } else if input.just_pressed(KeyCode::Down) {
+        start_rotation(rotation_data, fs.side, SeeDirection::Left);
     }
 }
 
-fn start_rotation(rotation_data: &mut RotationData, rotation: CartesianDirection) {
+/// @param see_direction: The side (seen from the camera) that this rotation is rotating around
+fn start_rotation(rotation_data: &mut RotationData, rotation: CartesianDirection, _see_direction: SeeDirection) {
     // If the rotation axis is not parallel to the top axis, then this rotation will modify the side axis
     if !rotation.is_parallel_to(rotation_data.future_rotation_state.side) {
         let target = rotation_data
             .future_rotation_state
             .after_rotation(rotation)
             .side;
-        rotation_data.top_rotation_animation = Some(RotationAnimationData {
+        rotation_data.animations.push_back(RotationAnimationData {
             from: rotation_data.future_rotation_state.side,
             target,
             animation_started: Instant::now(),
+            side_changing: SeeDirection::Left,
         });
         rotation_data.future_rotation_state.side = target;
     }
@@ -192,23 +193,22 @@ fn start_rotation(rotation_data: &mut RotationData, rotation: CartesianDirection
             .future_rotation_state
             .after_rotation(rotation)
             .top;
-        rotation_data.side_rotation_animation = Some(RotationAnimationData {
+        rotation_data.animations.push_back(RotationAnimationData {
             from: rotation_data.future_rotation_state.top,
             target,
             animation_started: Instant::now(),
+            side_changing: SeeDirection::Top,
         });
         rotation_data.future_rotation_state.top = target;
     }
 }
 
 fn total_animation_rotation(
-    animations: &[&RotationAnimationData],
+    animations: &VecDeque<RotationAnimationData>,
     rotation_time: Duration,
 ) -> Quat {
     let mut output = Quat::IDENTITY;
-    // let mut output = animations.iter().flatten().last().map_or(Quat::IDENTITY, |p|p.partial_camera_translation(rotation_time));
-    // Iterate without Nones
-    for animation in animations {
+    for animation in animations.iter().rev() {
         output *= animation.partial_camera_translation(rotation_time);
     }
     output
@@ -216,18 +216,11 @@ fn total_animation_rotation(
 
 fn camera_up_vector(rotation_data: &RotationData, rotation_time: Duration) -> Vec3 {
     let mut output = rotation_data.rotation_state.top.as_vec3();
-    for animation in [
-        rotation_data.top_rotation_animation,
-        rotation_data.side_rotation_animation,
-    ]
-    .iter()
-    .flatten()
-    {
-        let top = rotation_data.rotation_state.top;
-        if (animation.target.is_parallel_to(top) || animation.from.is_parallel_to(top))
+    for animation in &rotation_data.animations {
+        if (animation.side_changing == SeeDirection::Top || animation.side_changing == SeeDirection::Bottom)
             && animation.target != animation.from
         {
-            output = animation.camera_up_vector(rotation_time);
+            output += animation.camera_up_vector(rotation_time) - animation.from.as_vec3();
         }
     }
     output
@@ -250,9 +243,6 @@ fn rotation_curve(time: f32) -> f32 {
 
 mod tests {
     #[test]
-    fn camera_location_test() {}
-
-    #[test]
     fn rotation_state_after_rotation_test() {
         use super::RotationState;
         use crate::utils::CartesianDirection::*;
@@ -262,4 +252,16 @@ mod tests {
             RotationState { top: X, side: Z }
         );
     }
-}
+    
+    use super::*;
+    use bevy::math::Quat;
+    use std::time::Duration;
+
+    #[test]
+    fn total_animation_rotation_with_no_animations() {
+        let animations = VecDeque::<RotationAnimationData>::new();
+        let rotation_time = Duration::from_secs(1);
+        let result = total_animation_rotation(&animations, rotation_time);
+        assert_eq!(result, Quat::IDENTITY);
+    }
+} 
