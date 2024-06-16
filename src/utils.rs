@@ -92,7 +92,7 @@ impl RadialDirection {
         self,
         normal: CartesianDirection,
     ) -> Option<CartesianDirection> {
-        if normal.abs() == self.rotation_axis().abs() {
+        if normal.is_parallel_to(self.rotation_axis()) {
             warn!(
                 "Tried to convert radial direction to cartesian direction on same axis as normal"
             );
@@ -115,8 +115,8 @@ impl RadialDirection {
         let out = CartesianDirection::directions()
             .iter()
             .find(|dir| {
-                dir.abs() != normal.abs()
-                    && dir.abs() != self.rotation_axis().abs()
+                !dir.is_parallel_to(normal.abs())
+                    && !dir.is_parallel_to(self.rotation_axis())
                     && dir.is_negative() ^ !negate
             })
             .copied();
@@ -136,7 +136,7 @@ impl RadialDirection {
     }
 }
 
-#[derive(PartialEq, Debug, Clone, Copy)]
+#[derive(PartialEq, Eq, Debug, Clone, Copy)]
 pub(crate) enum CartesianDirection {
     X,
     NegX,
@@ -207,6 +207,10 @@ impl CartesianDirection {
         }
     }
 
+    pub(crate) fn is_parallel_to(&self, other: CartesianDirection) -> bool {
+        self.abs() == other.abs()
+    }
+
     pub(crate) fn axis_num(&self) -> u32 {
         match self {
             Self::X | Self::NegX => 0,
@@ -227,22 +231,14 @@ impl CartesianDirection {
         }
     }
 
-    /// Returns the positive direction whose axis that is perpendicular to the two others. Returns
-    /// None if the two directions are on the same axis
-    pub(crate) fn get_perpendicular_axis(
-        &self,
-        other: CartesianDirection,
-    ) -> Option<CartesianDirection> {
-        if self.abs() == other.abs() {
-            // Both are on same axis, so there are two perpendiculars
+    /// Takes the cross product of the directions. Returns None if the two directions are on the same axis
+    pub(crate) fn cross(&self, other: CartesianDirection) -> Option<CartesianDirection> {
+        if self.is_parallel_to(other) {
+            // Both are on same axis
             return None;
         }
-        for axis_num in 0..3 {
-            if self.axis_num() != axis_num && other.axis_num() != axis_num {
-                return Some(CartesianDirection::from_axis_num(axis_num, true));
-            }
-        }
-        None
+
+        Self::from_vec3_round(self.as_vec3().cross(other.as_vec3()))
     }
 
     pub(crate) fn directions() -> [CartesianDirection; 6] {
@@ -261,7 +257,7 @@ impl CartesianDirection {
         let mut i = 0;
         for dir in Self::directions() {
             for dir2 in Self::directions() {
-                if dir.abs() == dir2.abs()
+                if dir.is_parallel_to(dir2)
                     || out
                         .iter()
                         .any(|&diagonal| diagonal == (dir, dir2) || diagonal == (dir2, dir))
@@ -275,4 +271,15 @@ impl CartesianDirection {
         }
         out
     }
+}
+
+/// Signifies the direction seen from the camera.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub(crate) enum SeeDirection {
+    Top,
+    Left,
+    Right,
+    Bottom,
+    BackLeft,
+    BackRight,
 }

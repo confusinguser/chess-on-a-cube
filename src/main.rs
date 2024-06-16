@@ -29,7 +29,7 @@ fn main() {
         )
         .insert_resource(gamemanager::Game::new(4))
         .add_startup_system(setup)
-        .add_system(cube_rotation::rotate)
+        .add_system(cube_rotation::iterate)
         .add_system(scene::update_cell_colors)
         .add_system(scene::prepare_unit_entity.run_if(any_with_component::<scene::PrepareUnit>()))
         .add_system(scene::move_unit_entities)

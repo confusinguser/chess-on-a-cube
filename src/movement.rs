@@ -290,7 +290,7 @@ mod parts {
             let left_right_axis = radial_direction
                 .to_cartesian_direction(coords.normal_direction())
                 .unwrap()
-                .get_perpendicular_axis(coords.normal_direction())
+                .cross(coords.normal_direction())
                 .unwrap();
 
             if edge_crossings > max_edge_crossings {
