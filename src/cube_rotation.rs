@@ -1,3 +1,4 @@
+use std::cmp::Ordering;
 use std::time::{Duration, Instant};
 
 use bevy::prelude::*;
@@ -20,7 +21,7 @@ pub(crate) struct RotationData {
 pub(crate) struct RotationState {
     #[derivative(Default(value = "CartesianDirection::Y"))]
     top: CartesianDirection,
-    #[derivative(Default(value = "CartesianDirection::X"))]
+    #[derivative(Default(value = "CartesianDirection::Z"))]
     side: CartesianDirection,
 }
 
@@ -73,9 +74,8 @@ impl RotationAnimationData {
         let animation_progress =
             (Instant::now() - self.animation_started).as_secs_f64() / rotation_time.as_secs_f64();
         let rotation_amount = rotation_curve(animation_progress as f32);
-        self.from.as_vec3() * (1.-rotation_amount) + self.target.as_vec3() * (rotation_amount)
+        self.from.as_vec3() * (1. - rotation_amount) + self.target.as_vec3() * (rotation_amount)
     }
-
 }
 
 pub(crate) fn iterate(
@@ -96,22 +96,32 @@ pub(crate) fn iterate(
     for mut camera in &mut query {
         let mut transform = camera.0;
         transform.translation = rotation_data.rotation_state.camera_location() * 2.;
-        // The camera rotates in the opposite direction from how the cube would have rotated to get
-        // to the same place
+
+        // Needed to prevent dropping this value
+        let animations = [
+            rotation_data.top_rotation_animation,
+            rotation_data.side_rotation_animation,
+        ];
+        let mut animations = animations
+            .iter()
+            .flatten()
+            .collect::<Vec<&RotationAnimationData>>();
+        // Sort by when the animation started. If this is not done, the animations may be added in the wrong order resulting in wrong rotation
+        animations.sort_by(|c1, c2| {
+            if c1.animation_started < c2.animation_started {
+                Ordering::Greater
+            } else {
+                Ordering::Less
+            }
+        });
         transform.translate_around(
             Vec3::ZERO,
-            total_animation_rotation(
-                &[
-                    rotation_data.top_rotation_animation,
-                    rotation_data.side_rotation_animation,
-                ],
-                rotation_duration,
-            ),
+            total_animation_rotation(&animations, rotation_duration),
         );
 
         transform.look_at(
             Vec3::new(0., 0., 0.),
-            camera_up_vector(rotation_data, rotation_duration)
+            camera_up_vector(rotation_data, rotation_duration),
         );
 
         camera.0 = transform;
@@ -192,12 +202,13 @@ fn start_rotation(rotation_data: &mut RotationData, rotation: CartesianDirection
 }
 
 fn total_animation_rotation(
-    animations: &[Option<RotationAnimationData>],
+    animations: &[&RotationAnimationData],
     rotation_time: Duration,
 ) -> Quat {
     let mut output = Quat::IDENTITY;
+    // let mut output = animations.iter().flatten().last().map_or(Quat::IDENTITY, |p|p.partial_camera_translation(rotation_time));
     // Iterate without Nones
-    for animation in animations.iter().flatten() {
+    for animation in animations {
         output *= animation.partial_camera_translation(rotation_time);
     }
     output
@@ -209,8 +220,8 @@ fn camera_up_vector(rotation_data: &RotationData, rotation_time: Duration) -> Ve
         rotation_data.top_rotation_animation,
         rotation_data.side_rotation_animation,
     ]
-        .iter()
-        .flatten()
+    .iter()
+    .flatten()
     {
         let top = rotation_data.rotation_state.top;
         if (animation.target.is_parallel_to(top) || animation.from.is_parallel_to(top))
@@ -230,10 +241,10 @@ fn rotation_curve(time: f32) -> f32 {
     //     return 0.;
     // }
     // time
-    //
+
     let c1 = 1.70158;
     let c3 = c1 + 1.;
-
+    
     1. + c3 * (time - 1.).powi(3) + c1 * (time - 1.).powi(2)
 }
 
