@@ -92,7 +92,7 @@ impl RadialDirection {
         self,
         normal: CartesianDirection,
     ) -> Option<CartesianDirection> {
-        if normal.abs() == self.rotation_axis().abs() {
+        if normal.is_parallel_to(self.rotation_axis()) {
             warn!(
                 "Tried to convert radial direction to cartesian direction on same axis as normal"
             );
@@ -115,8 +115,8 @@ impl RadialDirection {
         let out = CartesianDirection::directions()
             .iter()
             .find(|dir| {
-                dir.abs() != normal.abs()
-                    && dir.abs() != self.rotation_axis().abs()
+                !dir.is_parallel_to(normal.abs())
+                    && !dir.is_parallel_to(self.rotation_axis())
                     && dir.is_negative() ^ !negate
             })
             .copied();
@@ -136,7 +136,7 @@ impl RadialDirection {
     }
 }
 
-#[derive(PartialEq, Debug, Clone, Copy)]
+#[derive(PartialEq, Eq, Debug, Clone, Copy)]
 pub(crate) enum CartesianDirection {
     X,
     NegX,
@@ -206,6 +206,10 @@ impl CartesianDirection {
             Self::Z | Self::NegZ => Self::Z,
         }
     }
+    
+    pub(crate) fn is_parallel_to(&self, other: CartesianDirection) -> bool {
+        self.abs() == other.abs()
+    }
 
     pub(crate) fn axis_num(&self) -> u32 {
         match self {
@@ -229,7 +233,7 @@ impl CartesianDirection {
 
     /// Takes the cross product of the directions. Returns None if the two directions are on the same axis
     pub(crate) fn cross(&self, other: CartesianDirection) -> Option<CartesianDirection> {
-        if self.abs() == other.abs() {
+        if self.is_parallel_to(other) {
             // Both are on same axis
             return None;
         }
@@ -253,7 +257,7 @@ impl CartesianDirection {
         let mut i = 0;
         for dir in Self::directions() {
             for dir2 in Self::directions() {
-                if dir.abs() == dir2.abs()
+                if dir.is_parallel_to(dir2)
                     || out
                         .iter()
                         .any(|&diagonal| diagonal == (dir, dir2) || diagonal == (dir2, dir))

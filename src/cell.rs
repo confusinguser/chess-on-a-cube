@@ -89,7 +89,7 @@ impl CellCoordinates {
         cube_side_length: u32,
     ) -> Option<(CellCoordinates, bool)> {
         let normal = self.normal_direction();
-        if normal.abs() == direction.abs() {
+        if normal.is_parallel_to(direction) {
             return None; // We ignore directions which would go out of and into the cube
         }
 
@@ -145,7 +145,7 @@ impl CellCoordinates {
         radial_direction: RadialDirection,
         cube_side_length: u32,
     ) -> Option<(CellCoordinates, bool)> {
-        if radial_direction.rotation_axis().abs() == self.normal_direction().abs() {
+        if radial_direction.rotation_axis().is_parallel_to(self.normal_direction()) {
             // The direction is not possible to go in on this side
             return None;
         }
@@ -163,8 +163,12 @@ impl CellCoordinates {
         diagonal: (CartesianDirection, CartesianDirection),
         cube_side_length: u32,
     ) -> Option<(CellCoordinates, bool)> {
-        let Some(cell1) = self.get_cell_in_direction(diagonal.0, cube_side_length) else {return None};
-        let Some(cell2) = cell1.0.get_cell_in_direction(diagonal.1, cube_side_length) else {return None};
+        let Some(cell1) = self.get_cell_in_direction(diagonal.0, cube_side_length) else {
+            return None;
+        };
+        let Some(cell2) = cell1.0.get_cell_in_direction(diagonal.1, cube_side_length) else {
+            return None;
+        };
         if cell1.1 && cell2.1 {
             // The second element tells us if the transformation went over a cube edge, in this
             // case we are in a corner, which means we have a true neighbor in cell2
