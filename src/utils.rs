@@ -171,9 +171,7 @@ impl CartesianDirection {
             return None;
         }
 
-        let Some(axis_num) = first_nonzero_component(vec) else {
-            return None;
-        };
+        let axis_num = first_nonzero_component(vec)?;
 
         Some(Self::from_axis_num(
             axis_num,
@@ -274,6 +272,7 @@ impl CartesianDirection {
 }
 
 /// Signifies the direction seen from the camera.
+#[allow(unused)]
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub(crate) enum SeeDirection {
     Top,

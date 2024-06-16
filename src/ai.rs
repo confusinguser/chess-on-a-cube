@@ -91,7 +91,7 @@ fn eval_recursive(
 
         if eval_next > eval {
             eval = eval_next;
-            best_variation = best_variation_returned.clone();
+            best_variation.clone_from(&best_variation_returned);
             if og {
                 ai_cache.last_variation = best_variation_returned;
             }

@@ -180,9 +180,7 @@ impl Units {
     }
 
     pub(crate) fn remove_unit(&mut self, coords: CellCoordinates) -> Option<Unit> {
-        let Some(index) = self.units.iter().position(|unit| unit.coords==coords) else {
-            return None;
-        };
+        let index = self.units.iter().position(|unit| unit.coords==coords)?;
 
         Some(self.units.swap_remove(index))
     }

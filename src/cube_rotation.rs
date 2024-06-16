@@ -58,6 +58,7 @@ impl RotationState {
         }
     }
 
+    #[allow(unused)]
     /// Panics in some cases if the rotation state is not possible. That is, if the side and top are parallel
     fn get_see_direction(&self, see_direction: SeeDirection) -> CartesianDirection {
         match see_direction {
@@ -172,7 +173,11 @@ fn input_handling(input: Res<Input<KeyCode>>, rotation_data: &mut RotationData) 
 }
 
 /// @param see_direction: The side (seen from the camera) that this rotation is rotating around
-fn start_rotation(rotation_data: &mut RotationData, rotation: CartesianDirection, _see_direction: SeeDirection) {
+fn start_rotation(
+    rotation_data: &mut RotationData,
+    rotation: CartesianDirection,
+    _see_direction: SeeDirection,
+) {
     // If the rotation axis is not parallel to the top axis, then this rotation will modify the side axis
     if !rotation.is_parallel_to(rotation_data.future_rotation_state.side) {
         let target = rotation_data
@@ -217,7 +222,8 @@ fn total_animation_rotation(
 fn camera_up_vector(rotation_data: &RotationData, rotation_time: Duration) -> Vec3 {
     let mut output = rotation_data.rotation_state.top.as_vec3();
     for animation in &rotation_data.animations {
-        if (animation.side_changing == SeeDirection::Top || animation.side_changing == SeeDirection::Bottom)
+        if (animation.side_changing == SeeDirection::Top
+            || animation.side_changing == SeeDirection::Bottom)
             && animation.target != animation.from
         {
             output += animation.camera_up_vector(rotation_time) - animation.from.as_vec3();
@@ -237,11 +243,18 @@ fn rotation_curve(time: f32) -> f32 {
 
     let c1 = 1.70158;
     let c3 = c1 + 1.;
-    
+
     1. + c3 * (time - 1.).powi(3) + c1 * (time - 1.).powi(2)
 }
 
+#[allow(unused_imports)]
 mod tests {
+    use std::time::Duration;
+
+    use bevy::math::Quat;
+
+    use super::*;
+
     #[test]
     fn rotation_state_after_rotation_test() {
         use super::RotationState;
@@ -252,10 +265,6 @@ mod tests {
             RotationState { top: X, side: Z }
         );
     }
-    
-    use super::*;
-    use bevy::math::Quat;
-    use std::time::Duration;
 
     #[test]
     fn total_animation_rotation_with_no_animations() {
@@ -264,4 +273,4 @@ mod tests {
         let result = total_animation_rotation(&animations, rotation_time);
         assert_eq!(result, Quat::IDENTITY);
     }
-} 
+}

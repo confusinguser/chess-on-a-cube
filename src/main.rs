@@ -40,7 +40,6 @@ fn main() {
 
 #[derive(Component)]
 struct MainCamera {
-    start_coords: Vec3,
 }
 
 fn setup(
@@ -66,7 +65,7 @@ fn setup(
     commands.spawn((
         PointLightBundle {
             point_light: PointLight {
-                intensity: 9000.0,
+                intensity: 5000.0,
                 range: 100.,
                 shadows_enabled: false,
                 ..default()
@@ -75,7 +74,6 @@ fn setup(
             ..default()
         },
         MainCamera {
-            start_coords: Vec3::new(8., 8., 8.),
         },
     ));
 
@@ -86,7 +84,6 @@ fn setup(
         },
         RaycastPickCamera::default(), // Enable picking with this camera
         MainCamera {
-            start_coords: Vec3::new(2., 2., 2.),
         },
     ));
 }

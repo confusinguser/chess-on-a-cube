@@ -12,6 +12,7 @@ pub(crate) struct GameMove {
 }
 
 impl GameMove {
+    #[allow(unused)]
     pub(crate) fn display_with_unit(&self, unit: Option<&Unit>) -> String {
         let mut output = String::new();
         if let Some(unit) = unit {

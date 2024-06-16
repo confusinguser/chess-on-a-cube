@@ -156,19 +156,15 @@ impl CellCoordinates {
     }
 
     /// Gets the diagonal that can be reached by walking in the cartesian directions consecutively,
-    /// does not return true neigbors. The second element of the second element denotes if the new
+    /// does not return true neighbors. The second element of the second element denotes if the new
     /// cell is on a different side than the first
     pub(crate) fn get_diagonal(
         &self,
         diagonal: (CartesianDirection, CartesianDirection),
         cube_side_length: u32,
     ) -> Option<(CellCoordinates, bool)> {
-        let Some(cell1) = self.get_cell_in_direction(diagonal.0, cube_side_length) else {
-            return None;
-        };
-        let Some(cell2) = cell1.0.get_cell_in_direction(diagonal.1, cube_side_length) else {
-            return None;
-        };
+        let cell1 = self.get_cell_in_direction(diagonal.0, cube_side_length)?;
+        let cell2 = cell1.0.get_cell_in_direction(diagonal.1, cube_side_length)?;
         if cell1.1 && cell2.1 {
             // The second element tells us if the transformation went over a cube edge, in this
             // case we are in a corner, which means we have a true neighbor in cell2
