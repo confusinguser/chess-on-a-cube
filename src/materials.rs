@@ -1,6 +1,7 @@
+use bevy::prelude::*;
+
 use crate::cell::CellColor;
 use crate::gamemanager::Palette;
-use bevy::prelude::*;
 
 pub(crate) fn select_cell_material(
     material: &mut StandardMaterial,

@@ -1,7 +1,6 @@
 use bevy::prelude::error;
 
 use crate::cell::{Board, CellCoordinates};
-
 use crate::units::*;
 use crate::utils::{CartesianDirection, RadialDirection};
 
@@ -134,7 +133,8 @@ fn pawn_movement(
         .iter()
         .filter(|diag| diag.0 == forward || diag.1 == forward)
     {
-        let Some(diagonal_coords) = unit_coords.get_diagonal(diagonal, board.cube_side_length) else {
+        let Some(diagonal_coords) = unit_coords.get_diagonal(diagonal, board.cube_side_length)
+        else {
             continue;
         };
 
@@ -236,7 +236,9 @@ mod parts {
             let mut dist = 0;
             let mut edge_crossings = 0;
             loop {
-                let Some(next_cell) = latest_cell.get_diagonal(diagonal, cube_side_length) else {break;};
+                let Some(next_cell) = latest_cell.get_diagonal(diagonal, cube_side_length) else {
+                    break;
+                };
 
                 if output.iter().any(|cell| *cell == next_cell.0) {
                     break;
@@ -270,7 +272,11 @@ mod parts {
     ) -> Vec<CellCoordinates> {
         let mut output = Vec::new();
         for radial_direction in RadialDirection::directions() {
-            let Some(mut forward_two) = coords.get_cell_in_radial_direction(radial_direction, cube_side_length) else {continue;};
+            let Some(mut forward_two) =
+                coords.get_cell_in_radial_direction(radial_direction, cube_side_length)
+            else {
+                continue;
+            };
             let mut edge_crossings = 0;
 
             if forward_two.1 {

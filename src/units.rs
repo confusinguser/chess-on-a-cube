@@ -1,9 +1,10 @@
 use std::slice::{Iter, IterMut};
 
+use bevy::prelude::*;
+
 use crate::cell::CellCoordinates;
 use crate::gamemanager::Team;
 use crate::utils::RadialDirection;
-use bevy::prelude::*;
 
 #[derive(Clone, Debug)]
 pub(crate) struct Unit {
@@ -180,7 +181,7 @@ impl Units {
     }
 
     pub(crate) fn remove_unit(&mut self, coords: CellCoordinates) -> Option<Unit> {
-        let index = self.units.iter().position(|unit| unit.coords==coords)?;
+        let index = self.units.iter().position(|unit| unit.coords == coords)?;
 
         Some(self.units.swap_remove(index))
     }

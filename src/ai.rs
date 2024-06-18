@@ -1,7 +1,7 @@
+use crate::{cell::*, movement};
 use crate::gamemanager::*;
 use crate::movement::*;
 use crate::units::*;
-use crate::{cell::*, movement};
 
 #[derive(Default)]
 pub(crate) struct AICache {

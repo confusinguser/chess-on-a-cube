@@ -1,12 +1,12 @@
-use bevy::prelude::*;
-use bevy::scene::SceneInstance;
-use bevy_mod_picking::prelude::*;
 use std::f32::consts::PI;
 
+use bevy::prelude::*;
 use bevy::prelude::Vec3;
+use bevy::scene::SceneInstance;
+use bevy_mod_picking::prelude::*;
 
 use crate::cell::{Cell, CellColor, CellCoordinates};
-use crate::gamemanager::{self, spawn_unit_entity, Game};
+use crate::gamemanager::{self, Game, spawn_unit_entity};
 use crate::materials;
 
 pub(crate) fn construct_cube(

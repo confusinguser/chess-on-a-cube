@@ -1,3 +1,7 @@
+use bevy::log::*;
+use bevy::prelude::*;
+use bevy_mod_picking::prelude::*;
+
 mod ai;
 mod cell;
 mod cube_rotation;
@@ -7,10 +11,6 @@ mod movement;
 mod scene;
 mod units;
 mod utils;
-
-use bevy::log::*;
-use bevy::prelude::*;
-use bevy_mod_picking::prelude::*;
 
 fn main() {
     App::new()
@@ -39,8 +39,7 @@ fn main() {
 }
 
 #[derive(Component)]
-struct MainCamera {
-}
+struct MainCamera {}
 
 fn setup(
     mut commands: Commands,
@@ -73,8 +72,7 @@ fn setup(
             transform: Transform::from_xyz(8., 8., 8.),
             ..default()
         },
-        MainCamera {
-        },
+        MainCamera {},
     ));
 
     commands.spawn((
@@ -83,7 +81,6 @@ fn setup(
             ..default()
         },
         RaycastPickCamera::default(), // Enable picking with this camera
-        MainCamera {
-        },
+        MainCamera {},
     ));
 }
