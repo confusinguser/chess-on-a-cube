@@ -1,11 +1,11 @@
-use crate::ai::AICache;
-use crate::movement::GameMove;
-use crate::{ai, movement, units::*};
-
-use crate::cell::*;
-use crate::scene::{self, MainCube, SceneChild};
 use bevy::prelude::*;
 use bevy_mod_picking::prelude::*;
+
+use crate::ai::AICache;
+use crate::cell::*;
+use crate::movement::GameMove;
+use crate::scene::{self, MainCube, SceneChild};
+use crate::{ai, movement, units::*};
 
 #[derive(Resource, Debug)]
 pub(crate) struct Game {
@@ -19,6 +19,7 @@ pub(crate) struct Game {
     pub(crate) palette: Palette,
     pub(crate) ai_playing: Option<Team>,
 }
+
 impl Game {
     pub(crate) fn new(cube_side_length: u32) -> Self {
         Game {
@@ -68,6 +69,7 @@ pub(crate) enum Team {
     Black,
     White,
 }
+
 impl Team {
     pub(crate) fn color(&self) -> Color {
         match self {
@@ -182,7 +184,9 @@ fn on_cell_clicked_play_phase(
 
     // Mark cells
     reset_cells_new_selection(game);
-    let Some(unit) = game.units.get_unit(clicked_coords) else { return;};
+    let Some(unit) = game.units.get_unit(clicked_coords) else {
+        return;
+    };
     if unit.team != game.turn {
         return;
     }
@@ -200,7 +204,7 @@ fn on_cell_clicked_play_phase(
                 if (unit.unit_type.can_capture_over_edge()
                     || unit_at_destination.is_none()
                     || unit.coords.normal_direction() == unit_move.normal_direction())
-                // Prevent taking units on same team
+                    // Prevent taking units on same team
                     && unit_at_destination.map_or(true, |unit_at_d| unit.team != unit_at_d.team)
                 {
                     cell.selected_unit_can_move_to = true;
@@ -223,13 +227,18 @@ pub(crate) fn make_move(game_move: GameMove, game: &mut Game, commands: &mut Com
         game.units.remove_dead_units();
     }
 
-    let Some(unit) = game.units.get_unit_mut(game_move.from) else {return false};
+    let Some(unit) = game.units.get_unit_mut(game_move.from) else {
+        return false;
+    };
     if unit.team != game.turn {
         return false;
     }
 
     unit.move_unit_to(game_move.to);
-    let Some(entity) = unit.entity else {warn!("Unit entity was None");return false;};
+    let Some(entity) = unit.entity else {
+        warn!("Unit entity was None");
+        return false;
+    };
     game.entities_to_move.push((entity, game_move.to));
     if let UnitType::Pawn(_, ref mut has_moved) = unit.unit_type {
         *has_moved = true;

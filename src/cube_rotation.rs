@@ -4,8 +4,8 @@ use std::time::{Duration, Instant};
 use bevy::prelude::*;
 use derivative::Derivative;
 
-use crate::MainCamera;
 use crate::utils::{CartesianDirection, SeeDirection};
+use crate::MainCamera;
 
 #[derive(Debug, Default, Clone)]
 pub(crate) struct RotationData {
