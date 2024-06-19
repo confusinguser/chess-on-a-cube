@@ -4,8 +4,8 @@ use std::time::{Duration, Instant};
 use bevy::prelude::*;
 use derivative::Derivative;
 
-use crate::utils::{CartesianDirection, SeeDirection};
 use crate::MainCamera;
+use crate::utils::{CartesianDirection, SeeDirection};
 
 #[derive(Debug, Default, Clone)]
 pub(crate) struct RotationData {
@@ -120,8 +120,6 @@ pub(crate) fn iterate(
     conclude_finished_animations(rotation_data, rotation_duration);
 
     input_handling(input, rotation_data);
-
-    dbg!(&rotation_data);
 
     // Apply the rotation
     for mut camera in &mut query {

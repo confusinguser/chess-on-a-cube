@@ -11,6 +11,7 @@ mod movement;
 mod scene;
 mod units;
 mod utils;
+mod ui;
 
 fn main() {
     App::new()
@@ -35,6 +36,9 @@ fn main() {
         .add_system(scene::move_unit_entities)
         .add_system(scene::spawn_missing_unit_entities)
         .add_system(gamemanager::ai_play)
+        .add_startup_system(ui::setup)
+        .add_system(ui::button_system)
+        .add_system(ui::ui_system)
         .run();
 }
 
