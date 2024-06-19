@@ -142,9 +142,8 @@ pub(crate) fn construct_cube(
                         ..default()
                     },
                     PickableBundle::default(),
-                    RaycastPickTarget::default(),
                     MainCube { coords },
-                    OnPointer::<Click>::run_callback(gamemanager::on_cell_clicked),
+                    On::<Pointer<Click>>::run_callback(gamemanager::on_cell_clicked),
                 ))
                 .id();
 
@@ -228,8 +227,7 @@ pub(crate) fn prepare_unit_entity(
         for entity in handles {
             commands.entity(entity).insert((
                 PickableBundle::default(),
-                RaycastPickTarget::default(),
-                OnPointer::<Click>::run_callback(gamemanager::on_unit_clicked),
+                On::<Pointer<Click>>::run_callback(gamemanager::on_unit_clicked),
                 SceneChild { parent_entity },
             ));
 

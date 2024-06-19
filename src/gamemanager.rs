@@ -100,17 +100,16 @@ pub(crate) enum GamePhase {
 }
 
 pub(crate) fn on_cell_clicked(
-    In(click): In<ListenedEvent<Click>>,
+    click: EventReader<Pointer<Click>>,
     mut query: Query<(Option<&MainCube>, &mut Transform)>,
     mut game: ResMut<Game>,
     commands: Commands,
-) -> Bubble {
+) {
     let game = &mut *game;
     match game.phase {
         GamePhase::Play => on_cell_clicked_play_phase(click.target, &mut query, game, commands),
         GamePhase::PlaceUnits => on_cell_clicked_place_units_phase(click.target, &mut query, game),
     }
-    Bubble::Up
 }
 
 fn on_cell_clicked_place_units_phase(
@@ -265,17 +264,17 @@ pub(crate) fn spawn_unit_entity(
 }
 
 pub(crate) fn on_unit_clicked(
-    In(click): In<ListenedEvent<Click>>,
+    click: EventReader<Pointer<Click>>,
     mut query: Query<(Option<&MainCube>, &mut Transform)>,
     scene_child_query: Query<&SceneChild>,
     mut game: ResMut<Game>,
     commands: Commands,
-) -> Bubble {
+) {
     let game = &mut *game;
     if game.phase == GamePhase::Play {
         let Ok(scene_child) = scene_child_query.get(click.target) else {
             warn!("Err when getting scene_child");
-            return Bubble::Up;
+            return;
         };
         if let Some(unit) = game.units.get_unit_from_entity(scene_child.parent_entity) {
             if let Some(cell) = game.board.get_cell(unit.coords) {
@@ -287,7 +286,6 @@ pub(crate) fn on_unit_clicked(
             warn!("Unit is None");
         }
     }
-    Bubble::Burst
 }
 
 pub(crate) fn ai_play(
