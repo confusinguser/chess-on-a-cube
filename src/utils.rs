@@ -28,6 +28,7 @@ pub(crate) fn first_nonzero_component(v: Vec3) -> Option<u32> {
     None
 }
 
+/// Returns the indices of the components that are non-zero
 pub(crate) fn nonzero_components(v: Vec3) -> Vec<u32> {
     let mut output = Vec::new();
     for i in 0..3 {
@@ -36,6 +37,24 @@ pub(crate) fn nonzero_components(v: Vec3) -> Vec<u32> {
         }
     }
     output
+}
+
+/// Used to represent a diagonal in the cube. The three booleans represent the diagonal axis
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct RadialDiagonal(pub(crate) bool, pub(crate) bool, pub(crate) bool);
+
+impl RadialDiagonal {
+    pub(crate) fn diagonals() -> Vec<RadialDiagonal> {
+        let mut out = Vec::new();
+        for i in [false, true] {
+            for j in [false, true] {
+                for k in [false, true] {
+                    out.push(Self(i, j, k));
+                }
+            }
+        }
+        out
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]

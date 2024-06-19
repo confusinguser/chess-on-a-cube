@@ -4,7 +4,7 @@ use std::ops::{Index, IndexMut};
 use bevy::prelude::*;
 
 use crate::gamemanager::Palette;
-use crate::utils::{self, CartesianDirection, RadialDirection};
+use crate::utils::{self, CartesianDirection, RadialDiagonal, RadialDirection};
 
 #[derive(Clone, Debug)]
 pub(crate) struct Cell {
@@ -85,7 +85,7 @@ impl CellCoordinates {
     /// than the first
     pub(crate) fn get_cell_in_direction(
         &self,
-        direction: utils::CartesianDirection,
+        direction: CartesianDirection,
         cube_side_length: u32,
     ) -> Option<(CellCoordinates, bool)> {
         let normal = self.normal_direction();
@@ -140,6 +140,8 @@ impl CellCoordinates {
         Some((adjacent, folded_to_other_face))
     }
 
+    /// Returns a tuple where the second element denotes if the new cell is on a different side
+    /// than the first
     pub(crate) fn get_cell_in_radial_direction(
         &self,
         radial_direction: RadialDirection,
@@ -159,8 +161,7 @@ impl CellCoordinates {
     }
 
     /// Gets the diagonal that can be reached by walking in the cartesian directions consecutively,
-    /// does not return true neighbors. The second element of the second element denotes if the new
-    /// cell is on a different side than the first
+    /// does not return true neighbors. The second element of the returned tuple denotes if the move crosses an edge
     pub(crate) fn get_diagonal(
         &self,
         diagonal: (CartesianDirection, CartesianDirection),
@@ -179,6 +180,36 @@ impl CellCoordinates {
         Some((cell2.0, cell1.1 || cell2.1))
     }
 
+    /// Gets the diagonal that can be reached by walking in the radial directions consecutively,
+    /// does not return true neighbors. The second element of the returned tuple denotes if the move crosses an edge
+    pub(crate) fn get_diagonal_radial(
+        &self,
+        diagonal: RadialDiagonal,
+        cube_side_length: u32,
+    ) -> Option<(CellCoordinates, bool)> {
+        let mut directions = Vec::new();
+        if self.x != 0 {
+            directions.push(CartesianDirection::from_axis_num(0, diagonal.0));
+        }
+        if self.y != 0 {
+            directions.push(CartesianDirection::from_axis_num(1, diagonal.1));
+        }
+        if self.z != 0 {
+            directions.push(CartesianDirection::from_axis_num(2, diagonal.2));
+        }
+
+        let Some(dir1) = directions.get(0) else {
+            error!("Directions vector is not large enough in get_diagonal_radial. This should not happen.");
+            return None;
+        };
+        let Some(dir2) = directions.get(1) else {
+            error!("Directions vector is not large enough in get_diagonal_radial. This should not happen.");
+            return None;
+        };
+        let directions = (*dir1, *dir2);
+        
+        self.get_diagonal(directions, cube_side_length)
+    }
     pub(crate) fn normal_direction(&self) -> CartesianDirection {
         if self.z == 0 {
             if self.normal_is_positive {

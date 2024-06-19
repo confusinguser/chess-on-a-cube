@@ -121,8 +121,6 @@ pub(crate) fn iterate(
 
     input_handling(input, rotation_data);
 
-    dbg!(&rotation_data);
-
     // Apply the rotation
     for mut camera in &mut query {
         let mut transform = camera.0;

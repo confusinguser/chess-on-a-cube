@@ -161,7 +161,7 @@ mod parts {
 
     use crate::cell::{Board, CellCoordinates};
     use crate::units::Units;
-    use crate::utils::{CartesianDirection, RadialDirection};
+    use crate::utils::{RadialDiagonal, RadialDirection};
 
     pub(crate) fn get_straight(
         coords: CellCoordinates,
@@ -231,21 +231,24 @@ mod parts {
         units: &Units,
     ) -> Vec<CellCoordinates> {
         let mut output = Vec::new();
-        for diagonal in CartesianDirection::diagonals() {
+        for diagonal in RadialDiagonal::diagonals() {
             let mut latest_cell = coords;
             let mut dist = 0;
             let mut edge_crossings = 0;
             loop {
-                let Some(next_cell) = latest_cell.get_diagonal(diagonal, cube_side_length) else {
+                let Some((next_cell, move_crosses_edge)) =
+                    latest_cell.get_diagonal_radial(diagonal, cube_side_length)
+                else {
                     break;
                 };
 
-                if output.iter().any(|cell| *cell == next_cell.0) {
+                // Check for loops
+                if output.iter().any(|cell| *cell == next_cell) {
                     break;
                 }
 
                 dist += 1;
-                if next_cell.1 {
+                if move_crosses_edge {
                     edge_crossings += 1;
                 }
 
@@ -253,13 +256,13 @@ mod parts {
                     break;
                 }
 
-                output.push(next_cell.0);
+                output.push(next_cell);
 
-                if units.is_unit_at(next_cell.0) {
+                if units.is_unit_at(next_cell) {
                     break;
                 }
 
-                latest_cell = next_cell.0;
+                latest_cell = next_cell;
             }
         }
         output
