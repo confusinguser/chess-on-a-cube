@@ -124,6 +124,7 @@ impl Units {
         self.units.push(unit)
     }
 
+    //noinspection RsLiveness
     pub(crate) fn game_starting_configuration(cube_side_length: u32) -> Units {
         let mut output = Units::default();
         macro_rules! unit_mirror {

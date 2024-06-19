@@ -63,7 +63,7 @@ impl CellCoordinates {
     pub(crate) fn get_adjacent(&self, cube_side_length: u32) -> [CellCoordinates; 4] {
         let mut output: [CellCoordinates; 4] = Default::default();
         let mut i = 0;
-        for direction in utils::CartesianDirection::directions() {
+        for direction in CartesianDirection::directions() {
             let adjacent = self.get_cell_in_direction(direction, cube_side_length);
 
             if adjacent.is_none() {

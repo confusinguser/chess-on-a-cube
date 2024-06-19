@@ -44,7 +44,7 @@ pub(crate) fn construct_cube(
     }
 
     let plane_mesh: Handle<Mesh> = meshes.add(shape::Plane::default().into());
-    let spacing = 1. / (side_length) as f32;
+    let spacing = 1. / side_length as f32;
     let offset = 0.5 - spacing / 2.;
     // The total side length of cube is always 1, so we offset
     // by 0.5 to get middle in origo. When cube at origo, half of its side is in negative

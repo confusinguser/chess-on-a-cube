@@ -1,7 +1,7 @@
+use crate::cell::*;
 use crate::gamemanager::*;
 use crate::movement::*;
 use crate::units::*;
-use crate::{cell::*, movement};
 
 #[derive(Default)]
 pub(crate) struct AICache {
@@ -163,7 +163,7 @@ fn get_possible_moves(board: &Board, units: &Units, team: Team) -> Vec<GameMove>
         if unit.team != team {
             continue;
         }
-        for move_to in movement::get_unit_moves(unit, board, units) {
+        for move_to in get_unit_moves(unit, board, units) {
             output.push(GameMove {
                 from: unit.coords,
                 to: move_to,
