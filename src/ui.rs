@@ -9,19 +9,15 @@ pub(crate) fn button_system(
     mut ui_query: Query<(&mut Style, &mut UI)>,
 ) {
     for (interaction, menu_button) in &mut interaction_query {
-        dbg!(interaction);
         match *interaction {
-            Interaction::Clicked => {
-                dbg!(menu_button.button_type);
-                match menu_button.button_type {
-                    ButtonType::Continue => {
-                        hide_all_uis(&mut ui_query);
-                    }
-                    ButtonType::Settings => {
-                        show_ui(&mut ui_query, UiType::Settings);
-                    }
+            Interaction::Clicked => match menu_button.button_type {
+                ButtonType::Continue => {
+                    hide_all_uis(&mut ui_query);
                 }
-            }
+                ButtonType::Settings => {
+                    show_ui(&mut ui_query, UiType::Settings);
+                }
+            },
             Interaction::Hovered => {}
             Interaction::None => {}
         }
