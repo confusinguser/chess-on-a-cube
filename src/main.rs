@@ -1,5 +1,6 @@
 use bevy::log::*;
 use bevy::prelude::*;
+use bevy::render::camera::Exposure;
 use bevy_mod_picking::prelude::*;
 
 mod ai;
@@ -18,7 +19,7 @@ fn main() {
             DefaultPlugins
                 .set(ImagePlugin::default_nearest())
                 .set(LogPlugin {
-                    level: Level::WARN,
+                    level: Level::INFO,
                     ..default()
                 }),
         )
@@ -28,13 +29,21 @@ fn main() {
                 .disable::<DefaultHighlightingPlugin>(),
         )
         .insert_resource(gamemanager::Game::new(4))
-        .add_startup_system(setup)
-        .add_system(cube_rotation::iterate)
-        .add_system(scene::update_cell_colors)
-        .add_system(scene::prepare_unit_entity.run_if(any_with_component::<scene::PrepareUnit>()))
-        .add_system(scene::move_unit_entities)
-        .add_system(scene::spawn_missing_unit_entities)
-        .add_system(gamemanager::ai_play)
+        .add_systems(Startup, setup)
+        .add_systems(
+            Update,
+            (
+                cube_rotation::iterate,
+                scene::update_cell_colors,
+                scene::move_unit_entities,
+                scene::spawn_missing_unit_entities,
+                gamemanager::ai_play,
+            ),
+        )
+        .add_systems(
+            Update,
+            scene::prepare_unit_entity.run_if(any_with_component::<scene::PrepareUnit>),
+        )
         .run();
 }
 
@@ -61,26 +70,17 @@ fn setup(
         &mut game,
     );
 
-    commands.spawn((
-        PointLightBundle {
-            point_light: PointLight {
-                intensity: 5000.0,
-                range: 100.,
-                shadows_enabled: false,
-                ..default()
-            },
-            transform: Transform::from_xyz(8., 8., 8.),
-            ..default()
-        },
-        MainCamera {},
-    ));
+    commands.insert_resource(AmbientLight {
+        color: Color::WHITE,
+        brightness: 1000.0,
+    });
 
     commands.spawn((
         Camera3dBundle {
             transform: Transform::from_xyz(2., 2., 2.).looking_at(Vec3::new(0., 0., 0.), Vec3::Y),
+            exposure: Exposure::BLENDER,
             ..default()
         },
-        RaycastPickCamera::default(), // Enable picking with this camera
         MainCamera {},
     ));
 }

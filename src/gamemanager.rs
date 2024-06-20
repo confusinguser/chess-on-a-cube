@@ -100,17 +100,22 @@ pub(crate) enum GamePhase {
 }
 
 pub(crate) fn on_cell_clicked(
-    In(click): In<ListenedEvent<Click>>,
+    mut click_events: EventReader<Pointer<Click>>,
     mut query: Query<(Option<&MainCube>, &mut Transform)>,
     mut game: ResMut<Game>,
-    commands: Commands,
-) -> Bubble {
+    mut commands: Commands,
+) {
     let game = &mut *game;
-    match game.phase {
-        GamePhase::Play => on_cell_clicked_play_phase(click.target, &mut query, game, commands),
-        GamePhase::PlaceUnits => on_cell_clicked_place_units_phase(click.target, &mut query, game),
+    for click in click_events.read() {
+        match game.phase {
+            GamePhase::Play => {
+                on_cell_clicked_play_phase(click.target, &mut query, game, &mut commands)
+            }
+            GamePhase::PlaceUnits => {
+                on_cell_clicked_place_units_phase(click.target, &mut query, game)
+            }
+        }
     }
-    Bubble::Up
 }
 
 fn on_cell_clicked_place_units_phase(
@@ -146,7 +151,7 @@ fn on_cell_clicked_play_phase(
     target: Entity,
     query: &mut Query<(Option<&MainCube>, &mut Transform)>,
     game: &mut Game,
-    mut commands: Commands,
+    commands: &mut Commands,
 ) {
     let cell_clicked = query.get(target);
     let clicked_coords;
@@ -174,9 +179,8 @@ fn on_cell_clicked_play_phase(
                 from,
                 to: clicked_coords,
             };
-            if make_move(game_move, game, &mut commands)
-                && game.units.get_unit_mut(clicked_coords).is_some()
-            {
+            if make_move(game_move, game, commands) {
+                assert!(game.units.get_unit(clicked_coords).is_some());
                 game.next_player_turn();
             }
         }
@@ -221,6 +225,7 @@ pub(crate) fn make_move(game_move: GameMove, game: &mut Game, commands: &mut Com
             return false;
         }
         if let Some(entity) = captured_unit.entity {
+            info!("Killing unit");
             scene::kill_unit(commands, entity);
         };
         captured_unit.dead = true;
@@ -265,29 +270,31 @@ pub(crate) fn spawn_unit_entity(
 }
 
 pub(crate) fn on_unit_clicked(
-    In(click): In<ListenedEvent<Click>>,
+    mut click_events: EventReader<Pointer<Click>>,
     mut query: Query<(Option<&MainCube>, &mut Transform)>,
     scene_child_query: Query<&SceneChild>,
     mut game: ResMut<Game>,
-    commands: Commands,
-) -> Bubble {
+    mut commands: Commands,
+) {
     let game = &mut *game;
-    if game.phase == GamePhase::Play {
-        let Ok(scene_child) = scene_child_query.get(click.target) else {
-            warn!("Err when getting scene_child");
-            return Bubble::Up;
-        };
-        if let Some(unit) = game.units.get_unit_from_entity(scene_child.parent_entity) {
-            if let Some(cell) = game.board.get_cell(unit.coords) {
-                on_cell_clicked_play_phase(cell.plane, &mut query, game, commands);
+    for click in click_events.read() {
+        if game.phase == GamePhase::Play {
+            let result = scene_child_query.get(click.target);
+            let Ok(scene_child) = result else {
+                warn!("Unit that was clicked on has disappeared");
+                return;
+            };
+            if let Some(unit) = game.units.get_unit_from_entity(scene_child.parent_entity) {
+                if let Some(cell) = game.board.get_cell(unit.coords) {
+                    on_cell_clicked_play_phase(cell.plane, &mut query, game, &mut commands);
+                } else {
+                    warn!("Cell is None");
+                }
             } else {
-                warn!("Cell is None");
+                warn!("Unit is None");
             }
-        } else {
-            warn!("Unit is None");
         }
     }
-    Bubble::Burst
 }
 
 pub(crate) fn ai_play(

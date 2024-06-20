@@ -111,7 +111,7 @@ impl RotationAnimationData {
 
 pub(crate) fn iterate(
     mut query: Query<(&mut Transform, &MainCamera)>,
-    input: Res<Input<KeyCode>>,
+    input: Res<ButtonInput<KeyCode>>,
     mut rotation_data: Local<RotationData>,
 ) {
     let rotation_data = &mut *rotation_data;
@@ -156,16 +156,16 @@ fn conclude_finished_animations(rotation_data: &mut RotationData, rotation_durat
     }
 }
 
-fn input_handling(input: Res<Input<KeyCode>>, rotation_data: &mut RotationData) {
+fn input_handling(input: Res<ButtonInput<KeyCode>>, rotation_data: &mut RotationData) {
     let fs = rotation_data.future_rotation_state; // Shorthand
-    if input.just_pressed(KeyCode::Right) {
+    if input.just_pressed(KeyCode::ArrowRight) {
         start_rotation(rotation_data, fs.top.opposite(), SeeDirection::Top);
-    } else if input.just_pressed(KeyCode::Left) {
+    } else if input.just_pressed(KeyCode::ArrowLeft) {
         start_rotation(rotation_data, fs.top, SeeDirection::Top);
     }
-    if input.just_pressed(KeyCode::Up) {
+    if input.just_pressed(KeyCode::ArrowUp) {
         start_rotation(rotation_data, fs.side.opposite(), SeeDirection::Left);
-    } else if input.just_pressed(KeyCode::Down) {
+    } else if input.just_pressed(KeyCode::ArrowDown) {
         start_rotation(rotation_data, fs.side, SeeDirection::Left);
     }
 }
