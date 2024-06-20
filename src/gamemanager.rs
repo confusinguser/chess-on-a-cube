@@ -1,19 +1,17 @@
 use bevy::prelude::*;
 use bevy_mod_picking::prelude::*;
 
+use crate::{ai, movement, units::*};
 use crate::ai::AICache;
 use crate::cell::*;
 use crate::movement::GameMove;
 use crate::scene::{self, MainCube, SceneChild};
-use crate::{ai, movement, units::*};
 
 #[derive(Resource, Debug)]
 pub(crate) struct Game {
     pub(crate) board: Board,
     pub(crate) units: Units,
     pub(crate) selected_cell: Option<CellCoordinates>,
-    pub(crate) phase: GamePhase,
-    pub(crate) stored_units: Vec<Unit>,
     pub(crate) turn: Team,
     pub(crate) entities_to_move: Vec<(Entity, CellCoordinates)>,
     pub(crate) palette: Palette,
@@ -26,8 +24,6 @@ impl Game {
             board: Board::new(cube_side_length),
             units: Units::game_starting_configuration(cube_side_length),
             selected_cell: None,
-            phase: GamePhase::PlaceUnits,
-            stored_units: vec![],
             turn: Team::White,
             entities_to_move: Vec::new(),
             palette: Palette::Pinkish,
@@ -93,79 +89,39 @@ impl Team {
     }
 }
 
-#[derive(PartialEq, Debug)]
-pub(crate) enum GamePhase {
-    PlaceUnits,
-    Play,
-}
-
 pub(crate) fn on_cell_clicked(
     mut click_events: EventReader<Pointer<Click>>,
-    mut query: Query<(Option<&MainCube>, &mut Transform)>,
+    query: Query<(Option<&MainCube>, &mut Transform)>,
     mut game: ResMut<Game>,
     mut commands: Commands,
 ) {
     let game = &mut *game;
-    for click in click_events.read() {
-        match game.phase {
-            GamePhase::Play => {
-                on_cell_clicked_play_phase(click.target, &mut query, game, &mut commands)
-            }
-            GamePhase::PlaceUnits => {
-                on_cell_clicked_place_units_phase(click.target, &mut query, game)
-            }
-        }
-    }
-}
-
-fn on_cell_clicked_place_units_phase(
-    target: Entity,
-    query: &mut Query<(Option<&MainCube>, &mut Transform)>,
-    game: &mut Game,
-) {
-    let game = &mut *game; // Convert game to normal rust reference for partial borrow
-    let cell_clicked = query.get(target);
-    let coords;
-    if let Ok(cell_clicked) = cell_clicked {
-        if cell_clicked.0.is_none() {
-            // Didn't click a part of the cube
-            return;
-        }
-        coords = cell_clicked.0.unwrap().coords;
-    } else {
+    let Some(click_event) = click_events.read().next() else {
         return;
+    };
+    let mut target = click_event.target;
+    for click_event in click_events.read() {
+        target = click_event.target;
     }
-
-    if game.units.get_unit(coords).is_none() {
-        if let Some(mut unit) = game.stored_units.pop() {
-            unit.coords = coords;
-            game.units.add_unit(unit);
-        }
-    }
-    if game.stored_units.is_empty() {
-        game.phase = GamePhase::Play;
-    }
+    on_cell_clicked_internal(target, &query, game, &mut commands)
 }
 
-fn on_cell_clicked_play_phase(
+fn on_cell_clicked_internal(
     target: Entity,
-    query: &mut Query<(Option<&MainCube>, &mut Transform)>,
+    query: &Query<(Option<&MainCube>, &mut Transform)>,
     game: &mut Game,
     commands: &mut Commands,
 ) {
-    let cell_clicked = query.get(target);
-    let clicked_coords;
-    if let Ok(cell_clicked) = cell_clicked {
-        if cell_clicked.0.is_none() {
-            // Didn't click a part of the cube
-            game.selected_cell = None;
-            reset_cells_new_selection(game);
-            return;
-        }
-        clicked_coords = cell_clicked.0.unwrap().coords;
-    } else {
+    let Ok(cell_clicked) = query.get(target) else {
+        return;
+    };
+    if cell_clicked.0.is_none() {
+        // Didn't click a part of the cube
+        game.selected_cell = None;
+        reset_cells_new_selection(game);
         return;
     }
+    let clicked_coords = cell_clicked.0.unwrap().coords;
 
     let old_selected_cell = game.selected_cell;
     game.selected_cell = Some(clicked_coords);
@@ -271,28 +227,26 @@ pub(crate) fn spawn_unit_entity(
 
 pub(crate) fn on_unit_clicked(
     mut click_events: EventReader<Pointer<Click>>,
-    mut query: Query<(Option<&MainCube>, &mut Transform)>,
+    query: Query<(Option<&MainCube>, &mut Transform)>,
     scene_child_query: Query<&SceneChild>,
     mut game: ResMut<Game>,
     mut commands: Commands,
 ) {
     let game = &mut *game;
     for click in click_events.read() {
-        if game.phase == GamePhase::Play {
-            let result = scene_child_query.get(click.target);
-            let Ok(scene_child) = result else {
-                warn!("Unit that was clicked on has disappeared");
-                return;
-            };
-            if let Some(unit) = game.units.get_unit_from_entity(scene_child.parent_entity) {
-                if let Some(cell) = game.board.get_cell(unit.coords) {
-                    on_cell_clicked_play_phase(cell.plane, &mut query, game, &mut commands);
-                } else {
-                    warn!("Cell is None");
-                }
+        let result = scene_child_query.get(click.target);
+        let Ok(scene_child) = result else {
+            warn!("Unit that was clicked on has disappeared");
+            return;
+        };
+        if let Some(unit) = game.units.get_unit_from_entity(scene_child.parent_entity) {
+            if let Some(cell) = game.board.get_cell(unit.coords) {
+                on_cell_clicked_internal(cell.plane, &query, game, &mut commands);
             } else {
-                warn!("Unit is None");
+                warn!("Cell is None");
             }
+        } else {
+            warn!("Unit is None");
         }
     }
 }
