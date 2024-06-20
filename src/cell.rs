@@ -4,7 +4,7 @@ use std::ops::{Index, IndexMut};
 use bevy::prelude::*;
 
 use crate::gamemanager::Palette;
-use crate::utils::{self, CartesianDirection, RadialDiagonal, RadialDirection};
+use crate::utils::{CartesianDirection, RadialDiagonal, RadialDirection};
 
 #[derive(Clone, Debug)]
 pub(crate) struct Cell {
@@ -198,16 +198,15 @@ impl CellCoordinates {
             directions.push(CartesianDirection::from_axis_num(2, diagonal.2));
         }
 
-        let Some(dir1) = directions.get(0) else {
-            error!("Directions vector is not large enough in get_diagonal_radial. This should not happen.");
+        if directions.len() != 2 {
+            error!("Directions vector in get_diagonal_radial is not the right size (2), but rather {}. This should not happen.", directions.len());
             return None;
-        };
-        let Some(dir2) = directions.get(1) else {
-            error!("Directions vector is not large enough in get_diagonal_radial. This should not happen.");
-            return None;
-        };
+        }
+
+        let dir1 = directions.first()?;
+        let dir2 = directions.last()?;
         let directions = (*dir1, *dir2);
-        
+
         self.get_diagonal(directions, cube_side_length)
     }
     pub(crate) fn normal_direction(&self) -> CartesianDirection {

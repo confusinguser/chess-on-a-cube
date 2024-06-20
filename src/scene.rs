@@ -43,14 +43,17 @@ pub(crate) fn construct_cube(
         }
     }
 
-    let plane_mesh: Handle<Mesh> = meshes.add(shape::Plane::default().into());
+    let plane_mesh: Handle<Mesh> = meshes.add(
+        Plane3d::default()
+            .mesh()
+            .size(1. / side_length as f32, 1. / side_length as f32),
+    );
     let spacing = 1. / side_length as f32;
     let offset = 0.5 - spacing / 2.;
-    // The total side length of cube is always 1, so we offset
-    // by 0.5 to get middle in origo. When cube at origo, half of its side is in negative
-    // quadrant, so therefore we subtract the part that is already offset from this phenomenon.
+    // The total side length of the cube is always 1, so we offset
+    // by 0.5 to get the middle of it inside the origin. When cube at the origin, half of its side is in negative
+    // quadrant, therefore we subtract the part that is already offset from this phenomenon.
     for side in 0..6 {
-        //        lookup_planes.planes[side] = vec![None; side_length.pow(2) as usize];
         for i in 0..side_length.pow(2) {
             let translation;
             let mut rotation;
@@ -137,13 +140,12 @@ pub(crate) fn construct_cube(
                         mesh: plane_mesh.clone(),
                         material: materials.add(material.clone()),
                         transform: Transform::from_translation(translation)
-                            .with_scale(Vec3::splat(spacing))
                             .with_rotation(Quat::from_scaled_axis(rotation)),
                         ..default()
                     },
                     PickableBundle::default(),
                     MainCube { coords },
-                    On::<Pointer<Click>>::run_callback(gamemanager::on_cell_clicked),
+                    On::<Pointer<Click>>::run(gamemanager::on_cell_clicked),
                 ))
                 .id();
 
@@ -199,7 +201,7 @@ pub(crate) fn spawn_unit(
     entity
 }
 
-#[derive(Component)]
+#[derive(Component, Debug)]
 pub(crate) struct SceneChild {
     pub(crate) parent_entity: Entity,
 }
@@ -227,7 +229,7 @@ pub(crate) fn prepare_unit_entity(
         for entity in handles {
             commands.entity(entity).insert((
                 PickableBundle::default(),
-                On::<Pointer<Click>>::run_callback(gamemanager::on_unit_clicked),
+                On::<Pointer<Click>>::run(gamemanager::on_unit_clicked),
                 SceneChild { parent_entity },
             ));
 
@@ -236,7 +238,7 @@ pub(crate) fn prepare_unit_entity(
             // handle, therefore we clone it before changing color
             if let Ok(material_handle) = material_handle {
                 let material_handle = material_handle.into_inner();
-                let material = materials.get_mut(material_handle).unwrap();
+                let material = materials.get_mut(material_handle.id()).unwrap();
                 let mut material_cloned = material.clone();
                 material_cloned.base_color = color;
                 let material_cloned_handle = materials.add(material_cloned);
