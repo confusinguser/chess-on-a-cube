@@ -196,7 +196,7 @@ fn make_move(game_move: GameMove, units: &mut Units) -> (bool, Option<Unit>) {
     let Some(unit) = units.get_unit_mut(game_move.from) else {
         return (false, None);
     };
-    unit.move_unit_to(game_move.to);
+    unit.coords = game_move.to;
     (true, captured_unit)
 }
 
@@ -204,7 +204,7 @@ fn unmake_move(game_move: GameMove, units: &mut Units, captured_unit: Option<Uni
     let Some(unit) = units.get_unit_mut(game_move.to) else {
         panic!("Couldn't undo move: {:?}, units: {:?}", game_move, units);
     };
-    unit.move_unit_to(game_move.from);
+    unit.coords = game_move.from;
     if let Some(captured_unit) = captured_unit {
         units.add_unit(captured_unit);
     }

@@ -129,6 +129,7 @@ fn pawn_movement(
         .to_cartesian_direction(unit_coords.normal_direction())
         .unwrap();
 
+    // Check if a capture is possible along a diagonal
     for &diagonal in CartesianDirection::diagonals()
         .iter()
         .filter(|diag| diag.0 == forward || diag.1 == forward)

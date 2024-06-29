@@ -1,3 +1,5 @@
+use std::hint::black_box;
+
 use bevy::prelude::*;
 use bevy_mod_picking::prelude::*;
 
@@ -128,8 +130,8 @@ fn on_cell_clicked_internal(
 
     let clicked_cell = game.board.get_cell_mut(clicked_coords).unwrap();
 
+    // Move selected unit to the clicked cell
     if clicked_cell.selected_unit_can_move_to {
-        // Move selected unit
         if let Some(from) = old_selected_cell {
             let game_move = GameMove {
                 from,
@@ -180,11 +182,13 @@ pub(crate) fn make_move(game_move: GameMove, game: &mut Game, commands: &mut Com
         if captured_unit.team == game.turn {
             return false;
         }
-        if let Some(entity) = captured_unit.entity {
-            info!("Killing unit");
-            scene::kill_unit(commands, entity);
-        };
-        captured_unit.dead = true;
+        kill_unit(commands, captured_unit);
+        if let UnitType::GhostPawn(linked_pawn_coords) = captured_unit.unit_type {
+            // Remove linked pawn
+            if let Some(linked_pawn) = game.units.get_unit_mut(linked_pawn_coords) {
+                kill_unit(commands, linked_pawn);
+            }
+        }
         game.units.remove_dead_units();
     }
 
@@ -195,16 +199,32 @@ pub(crate) fn make_move(game_move: GameMove, game: &mut Game, commands: &mut Com
         return false;
     }
 
-    unit.move_unit_to(game_move.to);
-    let Some(entity) = unit.entity else {
-        warn!("Unit entity was None");
-        return false;
-    };
-    game.entities_to_move.push((entity, game_move.to));
-    if let UnitType::Pawn(_, ref mut has_moved) = unit.unit_type {
+    unit.move_unit(&mut game.entities_to_move, game_move.to);
+    if let UnitType::Pawn(pawn_direction, ref mut has_moved) = unit.unit_type {
+        if !*has_moved && game_move.from.manhattan_dist(&game_move.to) == 2 {
+            // Spawn ghost pawn for en passant
+            let mut ghost_pawn = Unit::new(
+                UnitType::GhostPawn(game_move.to),
+                unit.team,
+                game_move
+                    .from
+                    .get_cell_in_radial_direction(pawn_direction, game.board.cube_side_length)
+                    .unwrap()
+                    .0,
+            );
+            game.units.add_unit(ghost_pawn);
+        }
         *has_moved = true;
     }
     true
+}
+
+fn kill_unit(commands: &mut Commands, captured_unit: &mut Unit) {
+    if let Some(entity) = captured_unit.entity {
+        info!("Killing unit");
+        scene::kill_unit(commands, entity);
+    };
+    captured_unit.dead = true;
 }
 
 fn reset_cells_new_selection(game: &mut Game) {

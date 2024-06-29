@@ -3,7 +3,7 @@ use std::slice::{Iter, IterMut};
 use bevy::prelude::*;
 
 use crate::cell::CellCoordinates;
-use crate::gamemanager::Team;
+use crate::gamemanager::{Game, Team};
 use crate::utils::RadialDirection;
 
 #[derive(Clone, Debug)]
@@ -31,8 +31,17 @@ impl Unit {
         self.entity = Some(entity);
     }
 
-    pub(crate) fn move_unit_to(&mut self, coords: CellCoordinates) {
-        self.coords = coords
+    pub(crate) fn move_unit(
+        &mut self,
+        entities_to_move: &mut Vec<(Entity, CellCoordinates)>,
+        coords: CellCoordinates,
+    ) {
+        self.coords = coords;
+        if let Some(entity) = self.entity {
+            entities_to_move.push((entity, coords));
+        } else {
+            warn!("Unit entity was None");
+        };
     }
 }
 
@@ -44,6 +53,11 @@ pub(crate) enum UnitType {
     King,
     /// (The direction that the pawn moves in, if the pawn has moved before)
     Pawn(RadialDirection, bool),
+    /// The ghost pawn is a pawn that is spawned when a pawn moves two steps forward. 
+    /// It can be captured by an enemy pawn that moves to the square behind the ghost pawn.
+    /// The ghost pawn is not a real unit, but a marker for the en passant rule.
+    /// The cell coordinates in the ghost pawn are the coordinates of the pawn that moved two steps forward.
+    GhostPawn(CellCoordinates),
     Knight,
     Queen,
 }

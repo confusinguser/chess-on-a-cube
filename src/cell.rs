@@ -59,6 +59,12 @@ impl CellCoordinates {
             normal_is_positive,
         }
     }
+    
+    pub(crate) fn manhattan_dist(&self, other: &CellCoordinates) -> usize {
+        ((self.x as i32 - other.x as i32).abs()
+            + (self.y as i32 - other.y as i32).abs()
+            + (self.z as i32 - other.z as i32).abs()) as usize
+    }
 
     pub(crate) fn get_adjacent(&self, cube_side_length: u32) -> [CellCoordinates; 4] {
         let mut output: [CellCoordinates; 4] = Default::default();
