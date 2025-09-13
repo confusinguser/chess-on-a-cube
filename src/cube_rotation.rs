@@ -1,5 +1,4 @@
 use std::collections::VecDeque;
-use std::time::{Duration, Instant};
 
 use bevy::prelude::*;
 use derivative::Derivative;
@@ -83,17 +82,16 @@ impl RotationState {
 pub(crate) struct RotationAnimationData {
     from: CartesianDirection,
     target: CartesianDirection,
-    animation_started: Instant,
+    animation_started: f64,
     /// What side seen from the camera that from and target are referring to
     side_changing: SeeDirection,
 }
 
 impl RotationAnimationData {
     /// Returns the partial camera translation that has currently happened in the animation in this axis
-    fn partial_camera_translation(&self, rotation_time: Duration) -> Quat {
-        let animation_progress =
-            (Instant::now() - self.animation_started).as_secs_f64() / rotation_time.as_secs_f64();
-        let rotation_amount = rotation_curve(animation_progress as f32);
+    fn partial_camera_translation(&self, current_time: f64, rotation_duration: f32) -> Quat {
+        let animation_progress = ((current_time - self.animation_started) as f32) / rotation_duration;
+        let rotation_amount = rotation_curve(animation_progress.clamp(0.0, 1.0));
         let full_rotation = Quat::from_rotation_arc(self.from.as_vec3(), self.target.as_vec3());
         let mut axis_angle = full_rotation.to_axis_angle();
         axis_angle.1 *= rotation_amount;
@@ -101,10 +99,9 @@ impl RotationAnimationData {
     }
 
     /// Assuming this animation is one that changes the top, what is the intermediate camera up vector?
-    fn camera_up_vector(&self, rotation_time: Duration) -> Vec3 {
-        let animation_progress =
-            (Instant::now() - self.animation_started).as_secs_f64() / rotation_time.as_secs_f64();
-        let rotation_amount = rotation_curve(animation_progress as f32);
+    fn camera_up_vector(&self, current_time: f64, rotation_duration: f32) -> Vec3 {
+        let animation_progress = ((current_time - self.animation_started) as f32) / rotation_duration;
+        let rotation_amount = rotation_curve(animation_progress.clamp(0.0, 1.0));
         self.from.as_vec3() * (1. - rotation_amount) + self.target.as_vec3() * (rotation_amount)
     }
 }
@@ -113,13 +110,15 @@ pub(crate) fn iterate(
     mut query: Query<(&mut Transform, &MainCamera)>,
     input: Res<ButtonInput<KeyCode>>,
     mut rotation_data: Local<RotationData>,
+    time: Res<Time>,
 ) {
     let rotation_data = &mut *rotation_data;
-    let rotation_duration = Duration::from_secs(1);
+    let rotation_duration = 1.0; // Duration in seconds as f32
+    let current_time = time.elapsed_seconds_f64();
 
-    conclude_finished_animations(rotation_data, rotation_duration);
+    conclude_finished_animations(rotation_data, current_time, rotation_duration);
 
-    input_handling(input, rotation_data);
+    input_handling(input, rotation_data, current_time);
 
     // Apply the rotation
     for mut camera in &mut query {
@@ -128,22 +127,22 @@ pub(crate) fn iterate(
 
         transform.translate_around(
             Vec3::ZERO,
-            total_animation_rotation(&rotation_data.animations, rotation_duration),
+            total_animation_rotation(&rotation_data.animations, current_time, rotation_duration),
         );
 
         transform.look_at(
             Vec3::new(0., 0., 0.),
-            camera_up_vector(rotation_data, rotation_duration),
+            camera_up_vector(rotation_data, current_time, rotation_duration),
         );
 
         camera.0 = transform;
     }
 }
 
-fn conclude_finished_animations(rotation_data: &mut RotationData, rotation_duration: Duration) {
+fn conclude_finished_animations(rotation_data: &mut RotationData, current_time: f64, rotation_duration: f32) {
     let mut num_finished_animations = 0;
     for animation in &rotation_data.animations {
-        if (Instant::now() - animation.animation_started) > rotation_duration {
+        if (current_time - animation.animation_started) > rotation_duration as f64 {
             rotation_data
                 .rotation_state
                 .set_see_direction(animation.side_changing, animation.target);
@@ -156,17 +155,17 @@ fn conclude_finished_animations(rotation_data: &mut RotationData, rotation_durat
     }
 }
 
-fn input_handling(input: Res<ButtonInput<KeyCode>>, rotation_data: &mut RotationData) {
+fn input_handling(input: Res<ButtonInput<KeyCode>>, rotation_data: &mut RotationData, current_time: f64) {
     let fs = rotation_data.future_rotation_state; // Shorthand
     if input.just_pressed(KeyCode::ArrowRight) {
-        start_rotation(rotation_data, fs.top.opposite(), SeeDirection::Top);
+        start_rotation(rotation_data, fs.top.opposite(), SeeDirection::Top, current_time);
     } else if input.just_pressed(KeyCode::ArrowLeft) {
-        start_rotation(rotation_data, fs.top, SeeDirection::Top);
+        start_rotation(rotation_data, fs.top, SeeDirection::Top, current_time);
     }
     if input.just_pressed(KeyCode::ArrowUp) {
-        start_rotation(rotation_data, fs.side.opposite(), SeeDirection::Left);
+        start_rotation(rotation_data, fs.side.opposite(), SeeDirection::Left, current_time);
     } else if input.just_pressed(KeyCode::ArrowDown) {
-        start_rotation(rotation_data, fs.side, SeeDirection::Left);
+        start_rotation(rotation_data, fs.side, SeeDirection::Left, current_time);
     }
 }
 
@@ -175,6 +174,7 @@ fn start_rotation(
     rotation_data: &mut RotationData,
     rotation: CartesianDirection,
     _see_direction: SeeDirection,
+    current_time: f64,
 ) {
     // If the rotation axis is not parallel to the top axis, then this rotation will modify the side axis
     if !rotation.is_parallel_to(rotation_data.future_rotation_state.side) {
@@ -185,7 +185,7 @@ fn start_rotation(
         rotation_data.animations.push_back(RotationAnimationData {
             from: rotation_data.future_rotation_state.side,
             target,
-            animation_started: Instant::now(),
+            animation_started: current_time,
             side_changing: SeeDirection::Left,
         });
         rotation_data.future_rotation_state.side = target;
@@ -199,7 +199,7 @@ fn start_rotation(
         rotation_data.animations.push_back(RotationAnimationData {
             from: rotation_data.future_rotation_state.top,
             target,
-            animation_started: Instant::now(),
+            animation_started: current_time,
             side_changing: SeeDirection::Top,
         });
         rotation_data.future_rotation_state.top = target;
@@ -208,23 +208,24 @@ fn start_rotation(
 
 fn total_animation_rotation(
     animations: &VecDeque<RotationAnimationData>,
-    rotation_time: Duration,
+    current_time: f64,
+    rotation_duration: f32,
 ) -> Quat {
     let mut output = Quat::IDENTITY;
     for animation in animations.iter().rev() {
-        output *= animation.partial_camera_translation(rotation_time);
+        output *= animation.partial_camera_translation(current_time, rotation_duration);
     }
     output
 }
 
-fn camera_up_vector(rotation_data: &RotationData, rotation_time: Duration) -> Vec3 {
+fn camera_up_vector(rotation_data: &RotationData, current_time: f64, rotation_duration: f32) -> Vec3 {
     let mut output = rotation_data.rotation_state.top.as_vec3();
     for animation in &rotation_data.animations {
         if (animation.side_changing == SeeDirection::Top
             || animation.side_changing == SeeDirection::Bottom)
             && animation.target != animation.from
         {
-            output += animation.camera_up_vector(rotation_time) - animation.from.as_vec3();
+            output += animation.camera_up_vector(current_time, rotation_duration) - animation.from.as_vec3();
         }
     }
     output
@@ -247,8 +248,6 @@ fn rotation_curve(time: f32) -> f32 {
 
 #[allow(unused_imports)]
 mod tests {
-    use std::time::Duration;
-
     use bevy::math::Quat;
 
     use super::*;
@@ -267,8 +266,9 @@ mod tests {
     #[test]
     fn total_animation_rotation_with_no_animations() {
         let animations = VecDeque::<RotationAnimationData>::new();
-        let rotation_time = Duration::from_secs(1);
-        let result = total_animation_rotation(&animations, rotation_time);
+        let current_time = 0.0f64;
+        let rotation_duration = 1.0f32;
+        let result = total_animation_rotation(&animations, current_time, rotation_duration);
         assert_eq!(result, Quat::IDENTITY);
     }
 }

@@ -1,10 +1,12 @@
+#![cfg(target_arch = "wasm32")]
+
 use bevy::log::*;
 use bevy::prelude::*;
 use bevy::render::camera::Exposure;
 use bevy_mod_picking::prelude::*;
 
-#[cfg(target_arch = "wasm32")]
-use wasm_bindgen::prelude::wasm_bindgen;
+// WASM-specific imports
+use wasm_bindgen::prelude::*;
 
 mod ai;
 mod cell;
@@ -17,27 +19,30 @@ mod units;
 mod utils;
 
 // WASM entry point
-#[cfg(target_arch = "wasm32")]
 #[wasm_bindgen(start)]
 pub fn run() {
     // This provides better error messages in debug mode.
     console_error_panic_hook::set_once();
-    main();
-}
 
-fn main() {
     let mut app = App::new();
 
     app.add_plugins(
         DefaultPlugins
             .set(ImagePlugin::default_nearest())
+            .set(WindowPlugin {
+                primary_window: Some(Window {
+                    // Prevent tab key from tabbing out of canvas
+                    prevent_default_event_handling: false,
+                    ..default()
+                }),
+                ..default()
+            })
             .set(LogPlugin {
                 level: Level::INFO,
                 ..default()
             }),
-    );
-
-    app.add_plugins(
+    )
+    .add_plugins(
         DefaultPickingPlugins
             .build()
             .disable::<DefaultHighlightingPlugin>(),

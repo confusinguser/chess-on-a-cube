@@ -9,7 +9,7 @@ use crate::scene::{self, MainCube, SceneChild};
 
 #[derive(Resource, Debug)]
 pub(crate) struct Game {
-    pub(crate) board: Board,
+    pub board: Board,
     pub(crate) units: Units,
     pub(crate) selected_cell: Option<CellCoordinates>,
     pub(crate) turn: Team,
@@ -19,7 +19,7 @@ pub(crate) struct Game {
 }
 
 impl Game {
-    pub(crate) fn new(cube_side_length: u32) -> Self {
+    pub fn new(cube_side_length: u32) -> Self {
         Game {
             board: Board::new(cube_side_length),
             units: Units::game_starting_configuration(cube_side_length),
